@@ -19,6 +19,8 @@ def argumentos():
     p.add_argument('--ejecutar',action='store_true',help='sin esta opción solo calcula, no publica')
     p.add_argument('--zona-segura',action='store_true',help='confirmación humana: espacio libre, parada física disponible, autorizado, sin otros controles')
     p.add_argument('--csv',type=Path,default=Path('experimentos/dia01_roscar/movimientos_odom.csv'))
+    p.add_argument('--topic-cmd',default='/cmd_vel',help='tópico de órdenes; con twist_mux, usar la entrada autorizada que indique la plantilla')
+    p.add_argument('--topic-odom',default='/odom')
     a=p.parse_args()
     q=a.distancia if a.modo=='recta' else math.radians(a.grados)
     v=a.velocidad if a.velocidad is not None else (.10 if a.modo=='recta' else .50)
@@ -60,14 +62,14 @@ def main():
         yaw=math.atan2(2*(o.w*o.z+o.x*o.y),1-2*(o.y*o.y+o.z*o.z))
         last=(p.x,p.y,yaw)
         received_at=time.monotonic()
-    sub=node.create_subscription(Odometry,'/odom',odom,qos_profile_sensor_data)
+    sub=node.create_subscription(Odometry,a.topic_odom,odom,qos_profile_sensor_data)
     def tick(s=.05):
         rclpy.spin_once(node,timeout_sec=s)
     def wait(sec):
         end=time.monotonic()+sec
         while time.monotonic()<end and not interrupted: tick()
     def other_publishers():
-        return [i for i in node.get_publishers_info_by_topic('/cmd_vel') if not (i.node_name==node.get_name() and i.node_namespace==node.get_namespace())]
+        return [i for i in node.get_publishers_info_by_topic(a.topic_cmd) if not (i.node_name==node.get_name() and i.node_namespace==node.get_namespace())]
     before=after=None
     status='ABORTADO'
     elapsed=0.
@@ -75,11 +77,11 @@ def main():
     try:
         wait(2.)
         if interrupted: raise RuntimeError('Interrumpido antes de mover')
-        if other_publishers(): raise RuntimeError('Ya hay publicadores de /cmd_vel. Coordinar y no ejecutar en paralelo.')
-        types=dict(node.get_topic_names_and_types()).get('/cmd_vel',[])
-        if 'geometry_msgs/msg/Twist' not in types: raise RuntimeError('/cmd_vel Twist no detectado; revisar driver')
-        if last is None or time.monotonic()-received_at>.5: raise RuntimeError('/odom no disponible o desactualizado')
-        pub=node.create_publisher(Twist,'/cmd_vel',10)
+        if other_publishers(): raise RuntimeError(f'Ya hay publicadores de {a.topic_cmd}. Coordinar y no ejecutar en paralelo.')
+        types=dict(node.get_topic_names_and_types()).get(a.topic_cmd,[])
+        if 'geometry_msgs/msg/Twist' not in types: raise RuntimeError(f'{a.topic_cmd} Twist no detectado; revisar driver')
+        if last is None or time.monotonic()-received_at>.5: raise RuntimeError(f'{a.topic_odom} no disponible o desactualizado')
+        pub=node.create_publisher(Twist,a.topic_cmd,10)
         wait(1.)
         if interrupted or other_publishers() or pub.get_subscription_count()<1: raise RuntimeError('Sin suscriptor compatible, interrupción o publicador concurrente')
         if last is None or time.monotonic()-received_at>.5: raise RuntimeError('Odometría no actualizada')

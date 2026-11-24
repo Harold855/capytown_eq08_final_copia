@@ -18,8 +18,17 @@ def compensar(phi,L,cd=1.,ca=1.):
         raise ValueError('Comando o escala inválidos')
     return phi/ca,L/cd
 
+def giro_medido(theta_antes,theta_despues):
+    """Giro con signo entre dos rumbos, normalizado a [-pi, pi]. Usar para `medido` en giros."""
+    return wrap(theta_despues-theta_antes)
+
 def actualizar_escala(anterior,medido,comandado,alpha=.35,*,min_comando=1e-3,limites=(.5,1.5)):
-    """Rechaza muestras degeneradas y escalas incompatibles. Límites provisionales de laboratorio."""
+    """Rechaza muestras degeneradas y escalas incompatibles. Límites provisionales de laboratorio.
+
+    IMPORTANTE: `comandado` es lo que se ENVIÓ al robot (la salida de `compensar`, es decir
+    L/cd o phi/ca), no la distancia o el giro nominal. Con el valor comandado, la escala converge
+    a la relación real movimiento/comando; con el nominal converge a un valor sesgado
+    (~raíz de la escala real: con un giro 9 % mayor de lo ordenado, 1.044 en lugar de 1.09; ver tests)."""
     if not all(math.isfinite(v) for v in (anterior,medido,comandado,alpha,min_comando,*limites)):
         raise ValueError('Dato no finito')
     if not 0<alpha<=1 or min_comando<=0 or not 0<limites[0]<limites[1] or not limites[0]<=anterior<=limites[1]:

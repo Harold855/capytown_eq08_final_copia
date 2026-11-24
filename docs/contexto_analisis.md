@@ -6,7 +6,7 @@ Este documento resume la revisión de los cinco antecedentes del grupo (RC-0, RC
 
 **Etiquetas de confianza:** [Seguro] leído en el código, en los datos o ejecutado · [Probable] inferencia fuerte · [Especulando] hipótesis sin verificar.
 
-**Fuentes de verdad, en orden:** (1) el HTML oficial del reto, pestañas Reto y Simulador; (2) el repositorio del curso `granprix-esan`, todavía no recibido; (3) los manuales de Yahboom; (4) los retos previos, que son históricos y deben volver a comprobarse; (5) este documento, que contiene propuestas.
+**Fuentes de verdad, en orden (v1.2):** (1) lo que el docente indique por escrito; (2) su repositorio `codeplai/GranPrix` (commit `285c829`), que según el docente **manda sobre el HTML** en lo que programa cada parte (ver sección 9); (3) el HTML oficial del reto, pestañas Reto y Simulador, que sigue siendo la referencia de las reglas de carrera, la rúbrica (a confirmar) y la predicción firmada; (4) los manuales de Yahboom; (5) los retos previos, que son históricos y deben volver a comprobarse; (6) este documento, que contiene propuestas.
 
 ---
 
@@ -20,6 +20,7 @@ Este documento resume la revisión de los cinco antecedentes del grupo (RC-0, RC
 | Reto 2 · El Turno del Brazo | JetCobot | https://github.com/Harold855/Reto_2-El_Turno_del_Brazo/tree/main | |
 | Gran Reto del JetCobot | JetCobot | https://github.com/Harold855/El-Gran-Reto-de-JetCobot---Grupo-8/tree/main | |
 | Reto 1 · Domina la API del JetCobot | JetCobot | Sin repositorio (se entregó como `.zip` con plantillas, informe `.docx` y presentación `.pptx`) | Única evidencia de pick and place físico completo |
+| **GranPrix · repositorio del docente** | ROSCar y JetCobot | https://github.com/codeplai/GranPrix/tree/main | Parcial. Manda sobre el HTML en lo que programa cada parte (ver sección 9) |
 
 Manuales: JetCobot https://www.yahboom.net/study/JetCobot · MicroROS-Pi5 https://www.yahboom.net/study/MicroROS-Pi5
 
@@ -109,7 +110,7 @@ Manuales: JetCobot https://www.yahboom.net/study/JetCobot · MicroROS-Pi5 https:
 - Ejecutor oficial: giro y avance **en lazo abierto** con escalas estimadas (`φ/ca`, `L/cd`). Estimador `escala = medido/comandado` con filtro exponencial α.
 - ROS 2 solo dentro de cada máquina (`ROS_DOMAIN_ID=8`, `ROS_LOCALHOST_ONLY=1`); entre máquinas solo MQTT con Mosquitto en Race Control (192.168.50.10:1883). Carrito eq08: 192.168.50.108; estaciones .21–.24.
 - Vigilante: detener si se pierde el broker 1.5 s o llega la bandera roja.
-- Estación: **un solo programa con el rol por parámetro**, worker único, cinemática inversa y **MoveIt2**, comandos a través del **guardián** del curso, compensando `(dx, dy, dθ)`.
+- Estación (según el HTML): **un solo programa con el rol por parámetro**, worker único, cinemática inversa y **MoveIt2**, comandos a través del **guardián** del curso, compensando `(dx, dy, dθ)`. **v1.2:** según el repositorio del docente, el supervisor es del curso y el equipo escribe solo la estrategia de cambio (sección 9).
 - Tag AprilTag 36h11 de 6 cm, ID = número de estación, en el borde de la zona y de frente al carrito, a ≈28 cm de la cámara al llegar.
 - Cuna cónica en ménsula derecha de 8 × 8 cm, a 11 cm del centro del carrito, altura 9–12 cm declarada en el README. Cubos de 25 mm, A rojo, B verde, C azul.
 - Mesa en voladizo: cara superior a 15.8 cm, 14 cm libres debajo; eje del brazo a 29 cm del centro del dock; cuna a 18 cm del eje (14–22 cm con ±4 cm).
@@ -170,6 +171,13 @@ Para los dos últimos escenarios modifiqué una línea del modelo (`let cd = p.c
 8. ¿Quién fabrica la cuna y la ménsula?
 9. ¿Es obligatorio MoveIt2 o se acepta la IK del firmware (`send_coords`) a través del guardián?
 10. ¿Cómo se señala el fin al llegar a E1 tras la cuarta vuelta?
+11. (v1.2) ¿Qué secciones del HTML simplifica el repositorio y se mantiene la rúbrica? ¿`codeplai/GranPrix` equivale a `granprix-esan`?
+12. (v1.2) ¿Qué expone `BrazoJetCobot.mover`? ¿Hay guardián con límites y caja de trabajo, o solo lo que hace el supervisor?
+13. (v1.2) ¿Cuándo salen la plantilla del carrito, el supervisor, `plantilla_equipo` y `dock_frames.yaml`?
+14. (v1.2) ¿Se agrega `id`, `vuelta` y un motivo a `solicitud` y `resultado`?
+15. (v1.2) ¿Cómo recibe la estrategia su rol, el dock y la ranura de la bandeja?
+16. (v1.2) ¿Qué evidencia produce el `grabador` del curso y dónde está el validador?
+17. (v1.2) ¿Opción A, B o C de despliegue y quién asigna el turno de cada estación?
 
 ---
 
@@ -190,6 +198,8 @@ Para los dos últimos escenarios modifiqué una línea del modelo (`let cd = p.c
 **Principio:** medir primero los dos números críticos y decidir la arquitectura según los resultados.
 
 ### Fase 0 — sin laboratorio
+
+> **v1.2:** instalar `pc-race` del repositorio del docente (Python 3.12+) y su `simulador_carritos.py` contra Mosquitto local: es el banco de pruebas de integración. Importar los modelos de `pc-race/contrato/` para validar nuestros mensajes. No construir un Race Control propio.
 - Pedir `granprix-esan` y resolver las preguntas de la sección 4.
 - Programar en Python puro, con pruebas automáticas, lo que no depende del contrato: planificador, estimador de escalas, `wrap`, transformaciones (reset `map → odom`, compensación de la cuna), máquina de estados con tiempos límite, mux de seguridad y escritores de CSV.
 - MQTT detrás de un adaptador, para ajustarlo cuando llegue el contrato.
@@ -208,6 +218,8 @@ Para los dos últimos escenarios modifiqué una línea del modelo (`let cd = p.c
 - Días 7–9: varias vueltas seguidas, predicción firmada con parámetros medidos, ensayo general de 12 min.
 
 ### Arquitectura propuesta del carrito
+
+> **v1.2:** esta lista es la del HTML. Según el repositorio del docente, `puente_mqtt`, `vigilante_red`, `tablero_web` (base) y `grabador` son del curso. El equipo escribe `control_odometria`, `camara_apriltag` y `maquina_pit`, y extiende el tablero. Nuestro vigilante propio se reduce a proteger `/cmd_vel` ante la caída de nuestro nodo, mediante el timeout de nuestra entrada de `twist_mux`.
 1. Nodo de cámara (único dueño de la cámara) → imagen para el detector de tags y el grabador de video.
 2. Detector de tag → `/pit/medicion`.
 3. Nodo de misión: máquina de estados, planificador, ejecutor, estimador y reset `map → odom`.
@@ -218,10 +230,12 @@ Para los dos últimos escenarios modifiqué una línea del modelo (`let cd = p.c
 8. Adaptador `/battery` → `/battery_state`.
 
 ### Estación
-Un programa con rol por parámetro: cliente MQTT, validación de turno, idempotencia por id de solicitud, compensación de la cuna por composición de transformaciones rígidas, secuencia de pick and place a través del guardián. Base: la estructura de `ejecutar_secuencia` del Gran Reto, con los valores probados del Reto 1 y lo que faltaba (abrir la pinza antes de bajar, abortar si cierra en vacío, volver a una pose segura).
+> **v1.2:** MQTT, validación de turno, estados, deduplicación y congelado del brazo son del `supervisor_estacion` del curso. El equipo escribe `EstrategiaDeCambio.cambiar(pose, pieza_trae)` sobre el puerto `BrazoJetCobot`. Lo que sigue describe la parte que sí es nuestra.
+
+Estrategia de cambio por rol: compensación de la cuna por composición de transformaciones rígidas y secuencia de pick and place. Base: la estructura de `ejecutar_secuencia` del Gran Reto, con los valores probados del Reto 1 y lo que faltaba (abrir la pinza antes de bajar, abortar si cierra en vacío, volver a una pose segura).
 
 ### Qué no reutilizar
-El PID del cuadrado como controlador principal (el algoritmo oficial es otro), LAYA, voz y colas multicliente.
+El PID del cuadrado como controlador principal (el algoritmo oficial es otro), LAYA, voz y colas multicliente. Tampoco reescribir lo que el curso entrega: puente MQTT, vigilante de red, grabador, supervisor, Race Control.
 
 ---
 
@@ -236,3 +250,52 @@ A 0.10 m/s y 0.5 rad/s: 32 m → 320 s; 16 giros de 90° → ≈50 s; 16 pits de
 - La recta "0.9299 m de odometría, 0.963 m física" del §2.1 no aparece en ningún CSV del RC-0. El dato real de la corrida 2 es 0.9453 / 0.963 m. [Seguro]
 - No menciona el Reto 1 del JetCobot, única evidencia de manipulación física.
 - No menciona la falta de watchdog de `/cmd_vel` en el firmware.
+
+---
+
+## 9. Repositorio del docente (`codeplai/GranPrix`, commit `285c829`)
+
+Revisado el 24-nov-2026. El docente indicó que su repositorio **manda** sobre el HTML y que simplifica algunas secciones. Es **parcial**: un solo commit, 89 archivos.
+
+**Qué contiene:**
+
+| Parte | Estado | Comprobado |
+|---|---|---|
+| `pc-race/` (Race Control: dominio, ledger SQLite, gateway MQTT, API web, tablero del juez, simulador de carritos) | Pasos 1 a 4 hechos | 126 pruebas pasan y `ruff` sale limpio. No corrí `mypy` ni el simulador (no hay Mosquitto en el entorno) |
+| `docs/arquitectura/00` a `04` | Escritos | Contrato, Race Control, estación, carrito y despliegue por SSH |
+| `estacion/herramientas/herramienta_apriltag.py` | Hecha | Sus pruebas abortaron en mi entorno al crear el detector (`pupil_apriltags`); causa desconocida. El propio repositorio dice que falta probarla con cámara real |
+| Supervisor, plantilla del equipo, código del carrito, `BrazoJetCobot` | **Pendiente** | No existen |
+| Guardián, `dock_frames.yaml`, `deploy`, validador de evidencia | **No aparecen** | Tampoco hay menciones |
+
+El nombre `granprix-esan` del HTML no aparece en el repositorio.
+
+**Reparto de trabajo según el repositorio:**
+- **Curso:** Race Control, `supervisor_estacion`, `BrazoJetCobot`, `puente_mqtt`, `vigilante_red`, `tablero_web` (base), `grabador` y el despliegue por SSH.
+- **Equipo, carrito:** `control_odometria` (ruta y escalas `cd`/`ca`), `camara_apriltag` (con base del curso) y `maquina_pit` (acople, solicitud, reset).
+- **Equipo, estación:** `EstrategiaDeCambio.cambiar(pose, pieza_trae)`, usando solo el objeto `brazo`. El brazo no usa cámara (decisión D3).
+
+**Diferencias del contrato frente al HTML:**
+
+| Tema | HTML | Repositorio |
+|---|---|---|
+| `solicitud` | equipo, vuelta, id, pose | equipo, dock, pose, `pieza_trae`; **sin id ni vuelta** |
+| `resultado` | id, ok, piezas, tiempo de pit | equipo, ok, `pieza_dejo`, `t_cambio`; sin id ni motivo |
+| Estados de estación | libre, acoplando, intercambiando, falla | `LIBRE`, `ESPERANDO`, `CAMBIANDO`, `LISTA`, `OFFLINE` |
+| Banderas | verde, amarilla, roja, cuadros | verde y roja |
+| Tópicos extra | — | `estacion/<n>/turno` y `eqNN/turno` |
+| Pose | dx, dy, dθ | `dx`, `dy` en m y `dth` en grados |
+| Despliegue | `deploy.sh` y `git pull` del tag | Race Control copia por SSH a `/opt/granprix/equipos/eqNN/` (opción B abierta) |
+
+**Detalles que condicionan nuestro diseño:**
+1. Sin `id`, Race Control empareja `solicitud` y `resultado` por equipo y estación; un duplicado QoS 1 puede pasar inadvertido.
+2. La validez de una vuelta depende de nuestro mensaje `vuelta`: los 4 pits `ok` deben caer entre su `t_inicio` y su `t_fin`.
+3. Un carrito pasa a `OFFLINE` tras 3 s sin telemetría.
+4. El pit de 10 s incluye latencia que no controlamos (supervisor, MQTT, puerto del brazo). La medición del ciclo de E2 debe hacerse con el supervisor cuando exista.
+5. Según `docs/arquitectura/03`, tras el `resultado` ok el carrito mide otra vez antes del reset. Falta confirmar si esa es la medición del "error después del pit".
+6. Si `BrazoJetCobot.mover` es cartesiano por firmware, el "IK y MoveIt2" del HTML deja de aplicar.
+
+**Qué hacer:**
+1. Instalar `pc-race` y su simulador como banco de pruebas, e importar `pc-race/contrato/` para validar nuestros mensajes.
+2. Avanzar con lógica pura y pruebas: planificador, estimador de escalas, FSM del pit, conversión de unidades en el borde MQTT.
+3. Probar la herramienta AprilTag con cámara real y medir la precisión contra cinta.
+4. Enviar al docente la lista de preguntas 11 a 17 de la sección 4.

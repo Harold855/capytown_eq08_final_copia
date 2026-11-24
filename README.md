@@ -2,7 +2,9 @@
 
 **Proyecto final de Robótica – CapyTown**
 
-> **Estado (24-nov-2026): planificación inicial.** Aún no hay código del carrito ni de la estación, ni corridas reales del GranPrix. Falta recibir el repositorio oficial `granprix-esan`. Los valores marcados como *propuesto* o *histórico* deben comprobarse antes de usarse. Detalle del análisis en [`docs/contexto_analisis.md`](docs/contexto_analisis.md).
+> **Estado (24-nov-2026): planificación inicial.** Aún no hay código del carrito ni de la estación, ni corridas reales del GranPrix. El docente publicó [`codeplai/GranPrix`](https://github.com/codeplai/GranPrix) (parcial: Race Control, herramienta AprilTag y documentos de arquitectura) y **manda sobre el HTML** en lo que programa cada parte. Los valores marcados como *propuesto* o *histórico* deben comprobarse antes de usarse. Detalle en [`docs/contexto_analisis.md`](docs/contexto_analisis.md) y [`contexto_division_reto_final.md`](contexto_division_reto_final.md).
+>
+> **Precedencia de fuentes:** (1) lo que el docente indique por escrito; (2) su repositorio; (3) el HTML oficial, que sigue siendo la referencia de las reglas de carrera, la rúbrica (a confirmar) y la predicción firmada. Donde el repositorio y el HTML difieren, este README lo señala.
 
 ## 1. Descripción del proyecto
 
@@ -108,27 +110,33 @@ En cada parada, dentro de los 10 s y en este orden:
 
 Cada parada guarda el error antes y después. Planificador y ejecutor oficiales: giro `φ = wrap(atan2(dy, dx) − θ)` y distancia `L = hypot(dx, dy)`, ejecutados en lazo abierto como `φ / ca` y `L / cd`; estimador `escala_nueva = escala + α·(medido/comandado − escala)`.
 
-> **Cuello de botella previsto:** el pit de 10 s en E2/E3. Un intercambio de 6 s más un reintento de 4 s consume todo el presupuesto. Hay que cronometrar por separado visión, acople, MQTT, movimientos del brazo, reset y salida. *(Análisis del equipo; no es una regla oficial.)*
+> **Cuello de botella previsto:** el pit de 10 s en E2/E3. Un intercambio de 6 s más un reintento de 4 s consume todo el presupuesto. Hay que cronometrar por separado visión, acople, MQTT, movimientos del brazo, reset y salida. *(Análisis del equipo; no es una regla oficial.)* Según `docs/arquitectura/03` del repositorio del docente, tras un `resultado` ok el carrito mide otra vez antes del reset y la recalibración: confirmar si esa medición es el "error después del pit" y si entra en los 10 s. El `t_cambio` que publica la estación mide solo el cambio de pieza; el tiempo del pit (frenado a arranque) lo medimos nosotros.
 
-## 9. Máquina de estados y módulos del carrito
+## 9. Máquina de estados y reparto de módulos
 
-Estados oficiales: `NAVEGANDO`, `ACOPLANDO`, `ESPERANDO`, `INTERCAMBIO`, `SALIENDO` y `FALLA`, con tiempo límite en cada uno.
+Estados oficiales del pit: `NAVEGANDO`, `ACOPLANDO`, `ESPERANDO`, `INTERCAMBIO`, `SALIENDO` y `FALLA`, con tiempo límite en cada uno.
 
-| Módulo | Función |
-|---|---|
-| Visión de tag | AprilTag + solvePnP → `(dx, dy, dθ)` en el marco del dock |
-| Planificador / ejecutor | `(φ, L)` y `/cmd_vel` en lazo abierto con `ca`, `cd` |
-| Estimador de calibración | `cd` y `ca` con filtro exponencial α |
-| Reset de pose | Corrige `map → odom` |
-| Acople fino | Corrección proporcional con el tag, tolerancias y 2 reintentos |
-| Vigilante | Detiene el carrito si se pierde el broker 1.5 s o llega bandera roja |
-| Registro | Video por vuelta, bag y CSV con hora común |
-| Puente y web | ROS ↔ MQTT y tablero HTTP |
-| Odometría visual | Opcional (bono +1) |
+**Quién programa qué, según el repositorio del docente** (`docs/arquitectura/02` y `03`; el HTML decía otra cosa en varias filas):
 
-**Decisiones propuestas** (por validar): un único punto que publique `/cmd_vel` (el vigilante, que además publica ceros si dejan de llegar órdenes, porque el firmware del ROSCar no frena solo); el tablero no controla motores directamente, solo pasa por la máquina de estados; no relanzar una manipulación cuyo resultado es desconocido.
+| Pieza | Dueño | Notas |
+|---|---|---|
+| `control_odometria` (ruta en lazo abierto, escalas `cd` y `ca`, reset de pose) | **Equipo** | Planificador y ejecutor con `φ/ca` y `L/cd` |
+| `camara_apriltag` (pose respecto al tag) | **Equipo**, con base del curso | Base: `estacion/herramientas/herramienta_apriltag.py`; falta probarla con cámara real |
+| `maquina_pit` (acople fino, solicitud, reintentos, reset) | **Equipo** | Máximo 2 reintentos; 4 cm y 6° |
+| `puente_mqtt` | Curso | Único nodo con red |
+| `vigilante_red` | Curso | Detiene las ruedas si no hay broker 1.5 s; actúa por `twist_mux` |
+| `tablero_web` | Curso, el equipo lo extiende | Debe cubrir todos los bloques de la sección 12 |
+| `grabador` | Curso | Video, rosbag2 y CSV de eventos de pit |
+| `supervisor_estacion` | Curso | Valida turno y solicitud, estados de la estación, congela el brazo |
+| `EstrategiaDeCambio` de la estación | **Equipo** | `cambiar(pose, pieza_trae)`; solo usa el objeto `brazo` |
+| `BrazoJetCobot` (puerto) | Curso | Mover, abrir y cerrar la pinza, soltar torque; aún no definido |
+| Despliegue en las estaciones | Curso (Race Control, SSH) | Opción B pendiente |
 
-**Estación:** un solo programa con el rol por parámetro (`E1`–`E4`), lanzado con `deploy.sh`. Valida el turno, es el worker único del brazo, usa cinemática inversa y MoveIt2, y envía todo al **guardián** del curso (límites de articulación, velocidad máxima y caja de trabajo; corta con la bandera roja). No se debe omitir ni modificar el guardián.
+**Se mantiene un riesgo propio:** el firmware del ROSCar conserva la última orden de `/cmd_vel`. El vigilante del curso cubre la pérdida de red, no la caída de **nuestro** nodo de control. Debemos configurar un timeout corto en nuestra entrada de `twist_mux` y comprobar en el robot que al vencer sale cero.
+
+**Cambios respecto al HTML:** ya no escribimos el puente MQTT, el vigilante de red, el tablero base ni el registro; y la estación no es un programa completo del equipo, sino la estrategia de cambio dentro del supervisor del curso. El brazo **no usa cámara** (decisión D3 del repositorio): toda la compensación depende de la pose que reporta el carrito.
+
+**Decisiones propuestas** (por validar): un solo bloque de lógica de pit en `maquina_pit`; el tablero no controla motores directamente, solo pasa por la máquina de estados; no relanzar una manipulación cuyo resultado es desconocido.
 
 ## 10. Intervenciones y ranking
 
@@ -146,22 +154,33 @@ Una intervención no declarada y descubierta en el video suma 3. Desempates: má
 
 ## 11. Tópicos MQTT
 
-Los esquemas JSON definitivos están en `contrato/` del repositorio oficial; **no inventar campos**. QoS 1 puede duplicar mensajes: usar idempotencia por id de solicitud y comprobar turno, vuelta y estación esperados.
+El contrato real está en `pc-race/contrato/` del repositorio del docente (modelos pydantic) y en `docs/arquitectura/00-contrato-mqtt.md`. **No inventar campos.** QoS 1 puede duplicar mensajes y el contrato actual no trae `id`: Race Control empareja `solicitud` y `resultado` por equipo y estación.
 
 | Tópico | Publica | QoS |
 |---|---|---|
-| `granprix/carrera/estado` | Race Control (fase, turno, vueltas) | 1, retenido |
-| `granprix/carrera/bandera` | Race Control (verde, amarilla, roja, cuadros) | 1 |
-| `granprix/eq08/telemetria` | Carrito | 0, hasta 5 Hz |
-| `granprix/eq08/evento` | Carrito (aquí se registran las intervenciones) | 1 |
-| `granprix/eq08/vuelta` | Carrito | 1 |
-| `granprix/estacion/<n>/solicitud` | Carrito | 1 |
-| `granprix/estacion/<n>/estado` | Estación | 1, retenido |
-| `granprix/estacion/<n>/resultado` | Estación | 1 |
+| `granprix/carrera/estado` | Race Control (tanda, fase, equipos) | 1, retenido |
+| `granprix/carrera/bandera` | Race Control (**verde o roja**) | 1 |
+| `granprix/estacion/<n>/turno` | Race Control (equipo con el turno) | 1, retenido |
+| `granprix/eq08/turno` | Race Control (autorizado o no) | 1, retenido |
+| `granprix/eq08/telemetria` | Carrito (pose, batería, velocidad; hasta 5 Hz) | 0 |
+| `granprix/eq08/evento` | Carrito (`intervencion`, `pit_ok`, `reintento`) | 1 |
+| `granprix/eq08/vuelta` | Carrito (número, `t_inicio`, `t_fin`, estaciones) | 1 |
+| `granprix/estacion/<n>/solicitud` | Carrito (equipo, dock, pose, `pieza_trae`) | 1 |
+| `granprix/estacion/<n>/estado` | Estación (`LIBRE`, `ESPERANDO`, `CAMBIANDO`, `LISTA`, `OFFLINE`) | 1, retenido |
+| `granprix/estacion/<n>/resultado` | Estación (equipo, ok, `pieza_dejo`, `t_cambio`) | 1 |
+
+Unidades de la pose: `dx` y `dy` en metros, `dth` en **grados**; internamente trabajamos en radianes y convertimos solo en el borde MQTT.
+
+**Diferencias con el HTML original:** la `solicitud` no lleva `id` ni `vuelta`; el `resultado` no lleva `id` ni motivo; los estados de la estación son otros; solo hay bandera verde y roja (la amarilla y los cuadros son locales del tablero); aparecen los tópicos de turno.
+
+**Detalles que condicionan nuestro diseño:**
+- Una vuelta es válida si los 4 pits `ok` caen entre el `t_inicio` y el `t_fin` de nuestro mensaje `vuelta`.
+- Un carrito pasa a `OFFLINE` tras 3 s sin telemetría: debe seguir publicando durante el pit y el acople.
+- Race Control usa el error de pose de la `solicitud` (`dx`, `dy`) para el desempate.
 
 ## 12. Evidencia y tablero
 
-**Evidencia** (se guarda en el Pi5 durante la tanda; el validador del curso es `vendor/granprix/evaluacion/validador_evidencia.py`):
+**Evidencia** (se guarda en el Pi5 durante la tanda). El HTML menciona un validador `evaluacion/validador_evidencia.py`, que **todavía no aparece** en el repositorio del docente. Tampoco está definido qué parte genera el `grabador` del curso y qué parte debemos generar nosotros; hasta saberlo, no escribir generadores duplicados:
 
 | Archivo | Contenido | Mínimo |
 |---|---|---|
@@ -177,7 +196,7 @@ Los esquemas JSON definitivos están en `contrato/` del repositorio oficial; **n
 
 ## 13. Entregables y rúbrica (20 puntos)
 
-Entregables: repositorio `capytown_eq08_final` (fork de `granprix-esan`, con `vendor/granprix` como submódulo sin modificar) con el tag `v1.0-final`; `deploy.sh` probado en las 4 Jetson; este README; la predicción firmada con la pestaña Simulador; la evidencia; e `informe.pdf` de 2 páginas.
+Entregables (según el HTML): repositorio `capytown_eq08_final` (fork de `granprix-esan`, con `vendor/granprix` como submódulo sin modificar) con el tag `v1.0-final`; `deploy.sh` probado en las 4 Jetson (según el repositorio del docente, el despliegue lo hace Race Control por SSH: confirmar qué se entrega); este README; la predicción firmada con la pestaña Simulador; la evidencia; e `informe.pdf` de 2 páginas.
 
 | Componente | Criterio | Pts |
 |---|---|---:|
@@ -191,6 +210,8 @@ Entregables: repositorio `capytown_eq08_final` (fork de `granprix-esan`, con `ve
 | Defensa | Explicar un video de vuelta sorteado | 1 |
 
 Bono: +1 por odometría visual documentada (sin pasar de 20). 7 de los 20 puntos (evidencia, tablero, informe y defensa) no dependen del resultado de la carrera.
+
+> **Por confirmar:** si los criterios Estación (que habla de `deploy.sh`), Tablero web y Evidencia se mantienen igual ahora que el curso aporta supervisor, tablero base y grabador. Mientras tanto, rige la rúbrica del HTML.
 
 ## 14. Antecedentes del grupo
 
@@ -226,28 +247,32 @@ Se reutilizarán componentes de los retos previos, pero **no** se copian proyect
 - Bags vacíos: en RC-1 dos de tres bags oficiales salieron sin mensajes; comprobar el conteo al grabar.
 - El robot publica `/battery` (`UInt16`), no `/battery_state`: hace falta un adaptador.
 
-**Preguntas pendientes para el docente** (lista completa en [`docs/contexto_analisis.md`](docs/contexto_analisis.md)):
-1. ¿El giro de salida en el dock cuenta dentro de los 10 s?
-2. ¿Qué es exactamente «error después del pit» si el carrito ya llega dentro de tolerancia?
-3. ¿Se permite cerrar el giro con IMU u odometría o debe ser estrictamente por tiempo?
-4. ¿Se puede iniciar `cd` y `ca` con valores calibrados antes de la tanda?
-5. ¿Dónde están el almacén y la bandeja de recepción respecto a la placa del brazo?
-6. ¿Es obligatorio MoveIt2 o se acepta la cinemática inversa del firmware a través del guardián?
+**Preguntas pendientes para el docente** (lista completa en [`docs/contexto_analisis.md`](docs/contexto_analisis.md)), por orden de impacto:
+1. ¿Qué secciones del HTML simplifica su repositorio y se mantiene la rúbrica? ¿`codeplai/GranPrix` es el `granprix-esan` del HTML?
+2. ¿Qué expone `BrazoJetCobot.mover` (articulaciones o pose cartesiana)? ¿Hay guardián con límites de articulación y caja de trabajo?
+3. ¿Cuándo salen la plantilla del carrito, el `supervisor_estacion`, `plantilla_equipo` y `dock_frames.yaml`?
+4. ¿Se agrega `id` (y `vuelta`) a `solicitud` y `resultado`, y un motivo al `resultado`?
+5. ¿Cómo recibe la estrategia su rol, el dock y la ranura de la bandeja? La firma `cambiar(pose, pieza_trae)` no los incluye.
+6. ¿El giro de salida en el dock y la segunda medición con el tag cuentan dentro de los 10 s? ¿Qué es exactamente "error después del pit"?
+7. ¿Se permite cerrar el giro con IMU u odometría o debe ser estrictamente por tiempo? ¿Se puede iniciar `cd` y `ca` con valores calibrados?
+8. ¿Qué evidencia produce el `grabador` y cuál debemos generar? ¿Dónde está el validador?
+9. ¿Opción A, B o C de despliegue y quién asigna el turno de cada estación?
+10. ¿Cuántas horas de acceso a los brazos tenemos antes de la tanda y cómo se accede a las Jetson?
 
 ## 16. Organización del repositorio
 
-- `carrito/`: programa de autonomía del ROSCar.
-- `estacion/`: programa de control de los JetCobot.
-- `vendor/`: dependencia oficial del curso (`vendor/granprix`, submódulo sin modificar; pendiente de recibir la URL).
+- `carrito/`: nodos del equipo (`control_odometria`, `camara_apriltag`, `maquina_pit`) y la extensión del tablero. **No se copian ni se reescriben** los nodos del curso (`puente_mqtt`, `vigilante_red`, `grabador`).
+- `estacion/`: la estrategia de cambio de pieza (`app_equipo`). El supervisor es del curso.
+- `vendor/`: repositorio del curso como submódulo, **sin modificar**. Falta confirmar si `codeplai/GranPrix` es el submódulo esperado antes de crear `.gitmodules`.
 - `simulacion/`: simulaciones y predicciones.
 - `scripts/`: automatización y diagnóstico.
-- `tests/`: pruebas unitarias y de integración.
-- `experimentos/`: pruebas experimentales (separadas de la evidencia oficial).
+- `tests/`: pruebas unitarias y de integración (primero contra `pc-race` y su simulador de carritos).
+- `experimentos/`: pruebas experimentales, separadas de la evidencia oficial.
 - `docs/`: documentación técnica. Incluye `contexto_analisis.md`.
-- `videos/`: videos de la tanda oficial.
-- `bags/`: registros ROS Bag.
+- `contexto_division_reto_final.md`: reparto del equipo, prioridades y plan por ventanas.
+- `videos/` y `bags/`: evidencia de la tanda.
 
-Este repositorio es provisional: no es un fork de `granprix-esan`. Al recibir la URL oficial se migrará al fork `capytown_eq08_final` con el submódulo correspondiente.
+Las carpetas del equipo se ajustarán a la plantilla del curso cuando exista; por ahora se guían por `docs/arquitectura/02` y `03` del repositorio del docente. Este repositorio es provisional: no es un fork de `granprix-esan`.
 
 ## 17. Datos por declarar (requeridos en el README final)
 
@@ -259,6 +284,8 @@ Este repositorio es provisional: no es un fork de `granprix-esan`. Al recibir la
 | ¿Se usó odometría visual? | Pendiente |
 | Altura real de la cuna (9–12 cm) | Pendiente: medir en el ROSCar asignado |
 | ROSCar asignado y calibración vigente | Pendiente: confirmar |
+| Reparto del equipo (roles A a E) | Propuesto en `contexto_division_reto_final.md`; por confirmar |
+| Estructura de carpetas de la plantilla del curso | Pendiente: el curso aún no la publica |
 
 ## 18. Referencias
 
@@ -266,4 +293,5 @@ Este repositorio es provisional: no es un fork de `granprix-esan`. Al recibir la
 - [Documentación oficial Yahboom MicroROS Pi5](https://www.yahboom.net/study/MicroROS-Pi5)
 - [Repositorio CapyTown RC-0](https://github.com/Harold855/RC-0_MicroRos_Pi5)
 - Documento oficial GranPrix Delivery Semiautónomo.
+- [Repositorio del docente `codeplai/GranPrix`](https://github.com/codeplai/GranPrix): Race Control, herramienta AprilTag y `docs/arquitectura/00`–`04`.
 - [REP-105](https://www.ros.org/reps/rep-0105.html), [AprilTag](https://github.com/AprilRobotics/apriltag), [OpenCV solvePnP](https://docs.opencv.org/4.x/d5/d1f/calib3d_solvePnP.html), [Eclipse Mosquitto](https://mosquitto.org/documentation/), [MoveIt 2](https://moveit.picknik.ai/).

@@ -1,0 +1,18 @@
+# Caches y entornos locales
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+*.egg-info/
+
+# Artefactos de ROS 2
+build/
+install/
+log/
+
+# Secretos (nunca subir claves, tokens ni contraseñas)
+.env
+*.key
+*.pem

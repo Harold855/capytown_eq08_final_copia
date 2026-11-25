@@ -1,0 +1,14 @@
+{
+  "_nota": "Copiar a poses_rolN.json y rellenar SOLO con poses enseñadas en el laboratorio (mm y grados: [x, y, z, rx, ry, rz]), con el carrito en su pose nominal. Valores null = sin enseñar: la estrategia no se mueve (NO_CONFIGURADO). Las listas de bandeja llevan 4 poses, una por pieza.",
+  "rol": 2,
+  "poses": {
+    "cuna_aprox": null,
+    "cuna_agarre": null,
+    "cuna_dejar": null,
+    "pose_libre": null,
+    "recepcion_aprox": null,
+    "recepcion_dejar": null,
+    "almacen_aprox": null,
+    "almacen_agarre": null
+  }
+}

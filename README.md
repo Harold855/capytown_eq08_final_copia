@@ -272,6 +272,8 @@ Se reutilizarán componentes de los retos previos, pero **no** se copian proyect
 - `contexto_division_reto_final.md`: reparto del equipo, prioridades y plan por ventanas.
 - `videos/` y `bags/`: evidencia de la tanda.
 
+**Entorno de desarrollo:** `bash scripts/preparar_entorno.sh` y `bash scripts/ejecutar_pruebas.sh` (detalle en [`docs/entorno_desarrollo.md`](docs/entorno_desarrollo.md)).
+
 Las carpetas del equipo se ajustarán a la plantilla del curso cuando exista; por ahora se guían por `docs/arquitectura/02` y `03` del repositorio del docente. Este repositorio es provisional: no es un fork de `granprix-esan`.
 
 ## 17. Datos por declarar (requeridos en el README final)

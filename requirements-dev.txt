@@ -1,0 +1,5 @@
+# Dependencias de desarrollo en la PC (no se instalan en el Pi5 ni en la Jetson).
+# ROS 2 y rclpy NO van aquí: vienen de la instalación de ROS 2 Humble.
+pydantic>=2.6      # pruebas del contrato MQTT contra los modelos del docente
+pytest>=8          # pruebas heredadas de RC-0 (scripts/historicos/rc0/test)
+ruff>=0.4          # estilo (opcional)

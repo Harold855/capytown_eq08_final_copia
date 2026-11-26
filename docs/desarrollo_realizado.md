@@ -52,6 +52,8 @@ Otros documentos: arquitectura en [`arquitectura.md`](arquitectura.md), requisit
 | `3ffad03` | AprilTag sin robot |
 | `7431e04` | Calibración de la cámara con regla y tag |
 | `a0862cb` | Calibración de la cámara con damero |
+| `8444c39` | Documentación completa: registro, arquitectura, requisitos e índice |
+| `1f965ea` | `medir_tag.py`: medición de la pose del tag con la cámara calibrada |
 
 `b503baf`, `37eabf9` y `ccd47aa` son anteriores y del equipo. No se abrió ningún PR.
 

@@ -271,5 +271,42 @@ class TestSeguridad(unittest.TestCase):
         self.assertAlmostEqual(ej.resultado().L_ejecutada, 0.5, places=9)
 
 
+class TestReversa(unittest.TestCase):
+    """L_cmd < 0 = marcha atrás a |v|. Solo con Config(permitir_reversa=True); el acople es el único que la activa."""
+    ATRAS = pl.Comando(0.0, -0.20, 0.10, 0.0, 0.0, 2.0)
+
+    def test_por_defecto_se_rechaza(self):
+        r = Reloj()
+        ej = EjecutorMovimiento(Planta(r, Pose2D(0, 0, 0)), r, Config())
+        with self.assertRaises(ValueError):
+            ej.iniciar(self.ATRAS)
+
+    def test_retrocede_la_distancia_comandada(self):
+        ej, planta, _ = ejecutar(self.ATRAS, cfg=Config(permitir_reversa=True))
+        self.assertEqual(ej.estado, Estado.COMPLETO)
+        self.assertAlmostEqual(planta.pose.x, -0.20, places=9)
+        self.assertAlmostEqual(planta.pose.y, 0.0, places=9)
+        self.assertTrue(all(v <= 0 for _, v, _ in planta.publicado))
+        self.assertEqual(planta.publicado[-1][1:], (0.0, 0.0))
+
+    def test_el_comando_efectivo_es_negativo_y_exacto(self):
+        ej, _, _ = ejecutar(self.ATRAS, cfg=Config(permitir_reversa=True))
+        ef = ej.comando_efectivo(self.ATRAS)
+        self.assertAlmostEqual(ef.L_cmd, -0.20, places=9)
+        self.assertEqual(ef.v, 0.10)                        # la rapidez sigue siendo positiva
+
+    def test_con_giro_previo_retrocede_en_el_nuevo_rumbo(self):
+        cmd = pl.Comando(math.pi / 2, -0.10, 0.10, 0.5, math.pi, 1.0)
+        _, planta, _ = ejecutar(cmd, cfg=Config(permitir_reversa=True))
+        self.assertAlmostEqual(planta.pose.x, 0.0, places=6)
+        self.assertAlmostEqual(planta.pose.y, -0.10, places=6)
+
+    def test_los_limites_de_velocidad_siguen_valiendo(self):
+        r = Reloj()
+        ej = EjecutorMovimiento(Planta(r, Pose2D(0, 0, 0)), r, Config(permitir_reversa=True))
+        with self.assertRaises(ValueError):
+            ej.iniciar(pl.Comando(0.0, -0.1, 0.21, 0.0, 0.0, 0.5))
+
+
 if __name__ == '__main__':
     unittest.main()

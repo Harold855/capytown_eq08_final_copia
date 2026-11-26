@@ -41,7 +41,7 @@ Entre máquinas solo hay MQTT, HTTP y SSH. ROS 2 vive dentro del Pi5. `twist_mux
 |---|---|---|---|
 | `control_odometria` | Equipo | `carrito/granprix_carrito/`: `planificador`, `ejecutor`, `calibracion` | Lógica **simulada**. No es un nodo ROS aún |
 | `camara_apriltag` | Equipo (base del curso) | `vision/` (medición, calibración, corrector de distorsión) | Medición (`vision/medicion.py`, `scripts/camara/medir_tag.py`), calibración y corrección de distorsión **simuladas**. El nodo `nodos/camara_apriltag_node.py` está escrito (solo probado contra un sustituto de `rclpy`) |
-| `maquina_pit` | Equipo | usa `planificar_acople`, `acople_valido`, `EstimadorEscalas`, `evaluar_reduccion` | **Pendiente** la máquina de estados |
+| `maquina_pit` | Equipo | usa `acople.acoplar`, `CalibradorTramo`, `acople_valido`, `EstimadorEscalas`, `evaluar_reduccion` | **Pendiente** la máquina de estados (el acople y la calibración por tramo ya están, simulados) |
 | `puente_mqtt`, `vigilante_red`, `tablero_web`, `grabador` | Curso | `integracion/` solo describe la conexión y los tópicos | Sin verificar con un broker real |
 | `placa_micro_ros` | Yahboom | `scripts/roscar_v01/` la diagnostica (solo lectura) | Sin verificar en el robot |
 
@@ -128,10 +128,10 @@ Orden del curso: medir → acoplar → solicitar → esperar resultado → medir
 |---|---|---|
 | medir la pose | `vision.medicion.CamaraTag.medir` y `agregar` (o `scripts/camara/medir_tag.py`), y `transformacion_camara_dock.desde_medicion` (o `pose_dock.py`) | probar `nodos/camara_apriltag_node.py` (o `tag_emulado.py` en el simulador); montaje medido; marco del dock del docente |
 | ¿está dentro de tolerancia? | `acople_valido`, `error_acople` | — |
-| corregir | `planificar_acople` + `EjecutorMovimiento` | orquestarlo con reintentos |
+| corregir | `acople.acoplar` (usa `planificar_acople` + `EjecutorMovimiento`, con reintentos; ver `acople.md`) | llamarlo desde la máquina de estados; ensayar con el robot |
 | solicitud / resultado | constructores de `scripts/roscar_v01/mensajes_contrato.py`, tópicos de `mqtt.yaml` | publicarlos vía `puente_mqtt` |
 | reset de pose | `LocalizadorDock.aplicar_reset` (sobre `ResetPose`; ver `marcos_y_reset_pose.md`) | medir el montaje de la cámara; probar `nodos/nodo_reset_pose.py` con ROS real |
-| recalibrar | `EstimadorEscalas.observar` | alimentarlo con la pose previa al acople |
+| recalibrar | `calibracion_tramo.CalibradorTramo.cerrar_parada` (alimenta a `EstimadorEscalas.observar` con la pose previa al acople) | llamarlo desde la máquina de estados |
 
 El estimador necesita la pose medida **antes** de cualquier acople, y el comando **realmente enviado**: de otro modo converge a un valor sesgado.
 

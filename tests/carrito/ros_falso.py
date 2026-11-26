@@ -52,9 +52,18 @@ class Logger:
 class Publicador:
     def __init__(self):
         self.enviados = []
+        self.suscriptores = 1
 
     def publish(self, m):
         self.enviados.append(m)
+
+    def get_subscription_count(self):
+        return self.suscriptores
+
+
+class Twist:
+    def __init__(self):
+        self.linear, self.angular = vector('x', 'y', 'z'), vector('x', 'y', 'z')
 
 
 class Reloj:
@@ -99,6 +108,15 @@ class Node:
     def get_logger(self):
         return Logger(self.reg)
 
+    def get_name(self):
+        return self.nombre
+
+    def get_namespace(self):
+        return '/'
+
+    def get_publishers_info_by_topic(self, topico):
+        return []
+
     def destroy_node(self):
         pass
 
@@ -117,7 +135,7 @@ class Difusor:
         self.enviados.append(t)
 
 
-NOMBRES = ('rclpy', 'rclpy.node', 'rclpy.qos', 'geometry_msgs', 'geometry_msgs.msg', 'nav_msgs', 'nav_msgs.msg', 'std_msgs',
+NOMBRES = ('rclpy', 'rclpy.node', 'rclpy.qos', 'rclpy.signals', 'geometry_msgs', 'geometry_msgs.msg', 'nav_msgs', 'nav_msgs.msg', 'std_msgs',
            'std_msgs.msg', 'std_srvs', 'std_srvs.srv', 'sensor_msgs', 'sensor_msgs.msg', 'tf2_ros')
 
 
@@ -126,11 +144,13 @@ def instalar():
         m = types.ModuleType(nombre)
         m.__dict__.update(atributos)
         sys.modules[nombre] = m
-    modulo('rclpy', init=lambda args=None: None, spin=lambda n: None, ok=lambda: True, shutdown=lambda: None)
+    modulo('rclpy', init=lambda args=None, **kw: None, spin=lambda n: None, spin_once=lambda n, timeout_sec=0: None,
+           ok=lambda: True, shutdown=lambda: None)
+    modulo('rclpy.signals', SignalHandlerOptions=Ns(NO=0))
     modulo('rclpy.node', Node=Node)
     modulo('rclpy.qos', qos_profile_sensor_data='SENSOR')
     modulo('geometry_msgs')
-    modulo('geometry_msgs.msg', PoseStamped=PoseStamped, TransformStamped=TransformStamped)
+    modulo('geometry_msgs.msg', PoseStamped=PoseStamped, TransformStamped=TransformStamped, Twist=Twist)
     modulo('nav_msgs')
     modulo('nav_msgs.msg', Odometry=type('Odometry', (), {}))
     modulo('sensor_msgs')

@@ -60,3 +60,13 @@ Cambios en lo anterior: `prueba_movimiento.py` acepta `--topic-cmd` y `--topic-o
 6. Anotar la sesión en `docs/bitacora_laboratorio.md`. Conservar también las corridas fallidas.
 
 Mientras la parada de bajo nivel no esté verificada, no pasar de 0.25 m ni de 15°.
+
+## Acople y calibración por tramo (v0.3)
+
+| Archivo | Para qué sirve |
+|---|---|
+| `prueba_acople.py` | Ensayo del acople fino en una estación: `simular` (sin ROS) o `ensayo` (lee `/tag/pose`; con `--ejecutar --zona-segura` mueve el robot) |
+| `prueba_calibracion_adaptativa.py` | Evolución de `cd` y `ca` en varios pits: `simular` un circuito o `repetir` con tramos medidos y otro `alpha` |
+| `analizar_acople.py` | Resumen y gráficos SVG (errores antes y después, escalas) del CSV de paradas |
+
+Detalle, advertencias de seguridad y resultados de simulación: [`docs/acople.md`](../../docs/acople.md). El modo `ensayo` solo se probó contra un `rclpy` sustituto.

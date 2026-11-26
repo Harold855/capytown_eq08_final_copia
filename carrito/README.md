@@ -6,6 +6,9 @@ Primer módulo real del carrito: el **planificador matemático** (sección 1.2 d
 carrito/granprix_carrito/
   docks.py          docks del circuito (nominales del HTML; cargables desde JSON), conversión mapa <-> dock
   planificador.py   tramos, comando compensado, estimador de escalas, vuelta, presupuesto y acople
+  acople.py         ciclo medir -> corregir -> medir con control proporcional (usa planificar_acople y el ejecutor)
+  calibracion_tramo.py  coordina las mediciones de cada parada con el estimador de escalas y guarda errores antes/después
+  config/acople.yaml    tolerancias, ganancias, velocidades, reintentos y alcance del acople
 simulacion/modelo_granprix.py   port a Python del simulate() del HTML, usando este planificador
 ```
 
@@ -103,6 +106,18 @@ Lectura: en este modelo 0.35 es un buen compromiso y no hay motivo para cambiarl
 
 **Lo que no cubre:** la medición de poses (tag) es de `vision/`, la conversión a pose en el dock y el reset de pose están en `transformacion_camara_dock.py` y `reset_pose.py` (ver `docs/marcos_y_reset_pose.md`) y la secuencia del pit es de otro módulo; aquí se asume que las poses llegan ya medidas y coherentes entre sí. No hay adaptador ROS ni se escribe el archivo de estado automáticamente: lo decide el nodo que use este módulo.
 
+## Acople fino y calibración por tramo (`acople.py`, `calibracion_tramo.py`)
+`acoplar(medir, mover, cfg, escalas)` corrige la pose en el dock con el tag (hasta `1 + reintentos` correcciones) y `CalibradorTramo.cerrar_parada(...)` alimenta al estimador con la pose de llegada **anterior** al acople y con el comando realmente enviado del tramo, sin mezclar las correcciones. Ciclo, salvaguardas, scripts de ensayo, cifras de simulación y riesgos (sobre todo el tiempo y la marcha atrás): [`docs/acople.md`](../docs/acople.md).
+
+```python
+from carrito.granprix_carrito.acople import acoplar, cargar_acople, mover_con_ejecutor, MedidorTag
+from carrito.granprix_carrito.calibracion_tramo import CalibradorTramo
+cfg = cargar_acople(None, mov)                                   # acople.yaml; exige v y w iguales a movimiento.yaml
+res = acoplar(medidor.medir, mover_con_ejecutor(salida, reloj, dormir, mov.ejecutor, cfg, odom_ok, al_parar=medidor.en_reposo),
+              cfg, est.escalas)
+parada = calibrador.cerrar_parada(estacion, res, post=pose_tras_el_intercambio, vuelta=1)
+```
+
 ## Verificación
 - **Equivalencia con el HTML oficial:** `simulacion/modelo_granprix.py` usa este planificador y reproduce el `simulate()` original (mismas semillas) en 18 casos y 288 llegadas, con una tolerancia de 1e-9 (`tests/carrito/test_equivalencia_html.py`). La referencia son salidas del JavaScript original ejecutado con Node.js (`tests/carrito/referencia_html.json`).
 - Pruebas en `tests/carrito/` (planificador, docks, equivalencia con el HTML y ejecutor con reloj falso y planta ideal con escalas reales, incluido un lazo cerrado planificador+ejecutor+estimador). Se ejecutan con `bash scripts/ejecutar_pruebas.sh`.
@@ -113,7 +128,7 @@ Lectura: en este modelo 0.35 es un buen compromiso y no hay motivo para cambiarl
 2. **Protecciones del estimador** (`proteger=True`, por defecto): escalas en [0.5, 1.5], cambio máximo de 0.05 por actualización, y se ignoran tramos con menos de 10 cm o giros fuera de 20°–150°. El HTML pide un "paso limitado" sin fijar números: son nuestros. Con `proteger=False` el resultado es idéntico al del simulador oficial.
 3. **Medir antes del acople:** la distancia y el giro de `medir_tramo` deben salir de las poses medidas al salir del dock anterior y al llegar al siguiente, antes de cualquier corrección.
 4. **Marco del dock** (origen en el centro, x en el rumbo de llegada, y a la izquierda) es un supuesto hasta que exista `dock_frames.yaml`. El rumbo de llegada de cada dock coincide con el sentido del tramo que lo precede.
-5. **Reversa:** el acople no usa reversa por defecto (el carrito no detecta obstáculos hacia atrás). `permitir_reversa=True` elige el camino de menor tiempo.
-6. **Por debajo de 1 cm** el acople no avanza, solo corrige el rumbo; los giros menores de 0.5° se omiten.
+5. **Reversa:** `planificar_acople` no la usa por defecto (el carrito no detecta obstáculos hacia atrás). `acople.acoplar` la permite hasta 10 cm (`reversa_max_m` en `acople.yaml`; 0 la desactiva) y el ejecutor solo la admite con `Config(permitir_reversa=True)`.
+6. **Por debajo de 1 cm** `planificar_acople` no avanza, solo corrige el rumbo; los giros menores de 0.5° se omiten (`acople.yaml` usa 1 cm y 1°).
 7. **No modela** aceleración, frenado, retardo de `/odom`, ni qué pasa si el tag deja de verse durante el acople.
 8. `scripts/roscar_v01/matematica.py` (v0.1) queda como referencia histórica; este módulo lo sustituye.

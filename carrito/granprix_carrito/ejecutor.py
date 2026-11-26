@@ -6,7 +6,8 @@ abierto, como pide el HTML). No usa ROS ni sabe de `/cmd_vel`: publica a través
 inyección, así que se prueba con un reloj falso.
 
 Se maneja con `paso()`, que un temporizador llama a ~20 Hz; no bloquea. Seguridad:
-- Rechaza comandos que superen 0.20 m/s o 0.8 rad/s, no finitos o más largos que `t_max_tramo_s`.
+- Rechaza comandos que superen 0.20 m/s o 0.8 rad/s, no finitos o más largos que `t_max_tramo_s`. La distancia negativa
+  (marcha atrás) solo se admite con `Config(permitir_reversa=True)`; la activa el acople, nadie más.
 - Aborta y manda ceros ante: parada externa, odometría perdida, hueco de tiempo entre llamadas,
   reloj que retrocede, error de la salida o tiempo máximo. Tras abortar NO reanuda por sí solo.
 - Entre el giro y el avance y al terminar publica ceros (pausa y asentamiento).
@@ -57,6 +58,7 @@ class Config:
     ceros_al_abortar: int = 5
     v_max: float = V_MAX
     w_max: float = W_MAX
+    permitir_reversa: bool = False     # solo el acople la activa (L_cmd < 0 = marcha atrás a |v|); no se carga del YAML
 
 
 @dataclass(frozen=True)
@@ -108,7 +110,8 @@ class EjecutorMovimiento:
         vals = (cmd.phi_cmd, cmd.L_cmd, cmd.v, cmd.w, cmd.t_giro, cmd.t_avance)
         if not all(math.isfinite(x) for x in vals):
             raise ValueError('comando no finito')
-        if cmd.L_cmd < 0 or not 0 < cmd.v <= self._cfg.v_max or abs(cmd.w) > self._cfg.w_max:
+        if (cmd.L_cmd < 0 and not self._cfg.permitir_reversa) or not 0 < cmd.v <= self._cfg.v_max \
+                or abs(cmd.w) > self._cfg.w_max:
             raise ValueError('comando fuera de los límites de velocidad o con distancia negativa')
         if cmd.t_giro + cmd.t_avance > self._cfg.t_max_tramo_s:
             raise ValueError(f'el tramo duraría más de {self._cfg.t_max_tramo_s:g} s')
@@ -123,7 +126,7 @@ class EjecutorMovimiento:
         if cmd.t_giro > 0 and cmd.t_avance > 0 and c.pausa_s > 0:
             seg.append((Estado.PAUSA, c.pausa_s, 0.0, 0.0))
         if cmd.t_avance > 0:
-            seg.append((Estado.AVANZANDO, cmd.t_avance, cmd.v, 0.0))
+            seg.append((Estado.AVANZANDO, cmd.t_avance, math.copysign(cmd.v, cmd.L_cmd) if cmd.L_cmd < 0 else cmd.v, 0.0))
         seg.append((Estado.ASENTANDO, c.asentamiento_s, 0.0, 0.0))
         self._segmentos = seg
         self._t0 = self._reloj()

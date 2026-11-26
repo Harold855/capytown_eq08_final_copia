@@ -25,7 +25,7 @@ Qué hay y cuándo leerlo. Los documentos están agrupados por lo que se necesit
 | [`procedimiento_laboratorio_roscar.md`](procedimiento_laboratorio_roscar.md) | Cómo se trabajó en RC-0 y RC-1 (VNC, contenedor, scripts) |
 | [`material_docente_rc1.md`](material_docente_rc1.md) | Material del docente de RC-1 y ensayo de los scripts en su simulador |
 | [`../scripts/roscar_v01/README.md`](../scripts/roscar_v01/README.md) | Preflight, diagnóstico, prueba de movimiento, registro y análisis de mediciones |
-| [`../carrito/README.md`](../carrito/README.md) | Planificador, ejecutor y estimadores: API, supuestos y verificación |
+| [`../carrito/README.md`](../carrito/README.md) | Planificador, ejecutor, estimadores y acople: API, supuestos y verificación |
 | [`bitacora_laboratorio.md`](bitacora_laboratorio.md) | Plantilla de la bitácora por sesión |
 
 ## Para la cámara y el AprilTag
@@ -34,6 +34,7 @@ Qué hay y cuándo leerlo. Los documentos están agrupados por lo que se necesit
 | [`apriltag_sin_robot.md`](apriltag_sin_robot.md) | Qué se puede probar sin robot, cifras de precisión, el efecto de la calibración y de la distorsión |
 | [`procedimiento_calibracion_camara.md`](procedimiento_calibracion_camara.md) | Calibrar la focal con regla y tag (primero) y validarla fuera del eje |
 | [`procedimiento_calibracion_damero.md`](procedimiento_calibracion_damero.md) | Calibrar con damero, incluida la distorsión (solo si lo anterior falla fuera del eje) |
+| [`acople.md`](acople.md) | Acople fino con el tag y calibración por tramo: ciclo, salvaguardas, cómo se alimenta el estimador, scripts de ensayo y lo que mostró la simulación |
 | [`marcos_y_reset_pose.md`](marcos_y_reset_pose.md) | Pasar la pose del tag a pose del robot en el dock y en el mapa, reset de pose, cómo medir el montaje de la cámara y cuánto pesa cada error |
 | [`procedimiento_medir_tag.md`](procedimiento_medir_tag.md) | Medir la pose del tag con la cámara calibrada, motivos de rechazo y cómo validarla con regla y transportador |
 

@@ -29,7 +29,8 @@ Otros documentos: arquitectura en [`arquitectura.md`](arquitectura.md), requisit
 | MQTT | `integracion/configuracion/mqtt.yaml`, `mqtt_config.py`, `scripts/roscar_v01/mensajes_contrato.py` | Verificado contra el contrato del docente; **sin broker real** |
 | Estación (JetCobot) | `estacion/` estrategia, roles, compensación, poses, brazo simulado; `scripts/jetcobot_v01/` | Simulado; **nunca contra un brazo** |
 | Visión sin robot | `vision/`, `simulacion/*sintetico.py`, calibración con regla y con damero, `medir_tag.py` | Simulado (cámara sintética); **nunca con la cámara real** |
-| Pruebas | 497 propias en 8 carpetas | Verificado |
+| ROSCar: acople fino y calibración por tramo | `carrito/granprix_carrito/acople.py`, `calibracion_tramo.py`, `config/acople.yaml`, `simulacion/robot_simulado.py`, `scripts/roscar_v01/prueba_acople.py`, `prueba_calibracion_adaptativa.py`, `analizar_acople.py` | Simulado; **el ensayo con el robot está preparado, sin ejecutar** |
+| Pruebas | 590 propias en 8 carpetas | Verificado |
 | Entorno | `scripts/preparar_entorno.sh`, `requirements-*.txt` | Verificado en Linux, Python 3.13 |
 
 **Lo que NO existe:** nodos ROS 2 del carrito (`control_odometria`, `camara_apriltag`, `maquina_pit`), el adaptador ROS 2 del ejecutor, la máquina de estados del pit, el tablero web, la cinemática y manipulación reales del brazo, y cualquier medición física. La lógica de arriba está lista para conectarse a ellos, pero conectarla es trabajo pendiente.
@@ -67,8 +68,8 @@ docs/                          documentación (índice en docs/README.md)
 vendor/granprix/               copia fija del repositorio del docente (NO se edita)
 carrito/                       lógica del ROSCar en Python puro
   nodos/                       nodo_reset_pose.py, tag_emulado.py, camara_apriltag_node.py (rclpy; sin verificar con ROS)
-  granprix_carrito/            docks, planificador, ejecutor, calibracion, configuracion
-  config/                      movimiento.yaml, calibracion.yaml
+  granprix_carrito/            docks, planificador, ejecutor, calibracion, acople, calibracion_tramo, configuracion
+  config/                      movimiento.yaml, calibracion.yaml, acople.yaml
 estacion/                      estrategia de cambio de pieza del JetCobot
   src/app_equipo/              puerto, roles, compensacion_pose, posiciones, estrategia, brazo_simulado, configuracion
   config/                      estacion.yaml, poses.plantilla.yaml
@@ -83,7 +84,7 @@ scripts/
   camara/                      calibrar_focal.py (regla), calibrar_damero.py y medir_tag.py
   historicos/                  copias de RC-0 y RC-1 (referencia, sin modificar)
   preparar_entorno.sh, ejecutar_pruebas.sh
-tests/                         una carpeta por paquete (497 pruebas)
+tests/                         una carpeta por paquete (590 pruebas)
 experimentos/                  plantillas de evidencia (vacío de mediciones reales)
 requirements-dev.txt, requirements-vision.txt
 ```
@@ -130,6 +131,14 @@ requirements-dev.txt, requirements-vision.txt
 - `scripts/roscar_v01/pose_dock.py convertir | montaje` lo expone por línea de comandos sobre la salida de `medir_tag.py`.
 - **Simulado:** escena física 3D independiente (2 mm y 0.2° en la zona de acople) y del píxel a la pose (p95 0.35 cm y 0.44°, con el montaje conocido). Los errores del montaje pasan 1 a 1 a la pose.
 - **Falta medir** el montaje de la cámara y la posición del tag en el dock (`marcos.yaml` falla mientras haya `null`), y el publicador ROS 2 del TF. Detalle: [`marcos_y_reset_pose.md`](marcos_y_reset_pose.md).
+
+### 4.5 ter ROSCar: acople fino y calibración por tramo (`acople.py`, `calibracion_tramo.py`)
+- `acoplar(medir, mover, cfg, escalas)` repite medir → corregir → medir con control proporcional hasta quedar dentro de una tolerancia interna (3 cm y 4°), con `1 + reintentos` correcciones como máximo. Reutiliza `planificar_acople`, `comandar` y `EjecutorMovimiento`; añade marcha atrás corta para sobrepasos (desactivada por defecto en el ejecutor), presupuesto de tiempo, alcance y motivos de parada. Tras un movimiento fallido no afirma ninguna pose.
+- `CalibradorTramo` garantiza que el estimador reciba la pose de llegada **anterior** a cualquier corrección (la toma del resultado del acople), el comando realmente enviado y nunca los movimientos del acople; guarda errores antes y después (criterio normalizado propio) y los exporta a CSV.
+- `MedidorTag` filtra las lecturas anteriores al reposo y devuelve la mediana; `mover_con_ejecutor` lo avisa al terminar cada movimiento.
+- Scripts: `prueba_acople.py` (simulado y ensayo físico preparado), `prueba_calibracion_adaptativa.py` (circuito simulado o repetición con tramos medidos), `analizar_acople.py` (resumen y SVG).
+- **Simulado:** Monte Carlo del acople y circuitos de 8 vueltas con el robot de `simulacion/robot_simulado.py` (cifras en `acople.md`). El modo `ensayo` se probó solo contra un `rclpy` sustituto con un mundo simulado; **nunca con el robot**. 12 errores introducidos a propósito en el código (signo, reintentos, pose posterior al acople, marcha atrás, etc.) fueron detectados por las pruebas.
+- **Hallazgo:** una corrección cuesta ≈ 4–5 s; con un intercambio de 6 s casi no cabe una dentro del pit de 10 s. Detalle y límites: [`acople.md`](acople.md).
 
 ### 4.6 Configuración YAML (`docs/configuracion.md`)
 Seis archivos, cada uno con su lector validado, más un cargador estricto compartido (`comun/yaml_estricto.py`):
@@ -213,15 +222,15 @@ bash scripts/ejecutar_pruebas.sh                   # "TODO OK" si pasan
 
 | Carpeta | Pruebas | Cubre |
 |---|---|---|
-| `tests/roscar_v01` | 48 | v0.1, registro, análisis, diagnóstico con `--simular` |
+| `tests/roscar_v01` | 68 | v0.1, registro, análisis, diagnóstico con `--simular`, conversión cámara → dock y scripts del acople (el modo `ensayo` con `rclpy` sustituto) |
 | `tests/integracion` | 20 | mensajes y `mqtt.yaml` contra el contrato del docente (necesita `pydantic`) |
 | `tests/geometria_dock` | 6 | transformaciones 2D |
 | `tests/estacion` | 38 | estrategia, compensación, poses, configuración |
 | `tests/jetcobot_v01` | 11 | diagnóstico y cronómetro |
-| `tests/carrito` | 207 | docks, planificador, equivalencia con el HTML, ejecutor, estimadores, configuración |
+| `tests/carrito` | 280 | docks, planificador, equivalencia con el HTML, ejecutor, estimadores, configuración, cámara → dock, reset, nodos con `rclpy` sustituto, acople y calibración por tramo |
 | `tests/comun` | 15 | cargador YAML estricto |
 | `tests/vision` | 152 | AprilTag sintético, calibración con regla y con damero, medición con `medir_tag` (≈ 45 s; se omiten si falta OpenCV) |
-| **Total propias** | **497** | |
+| **Total propias** | **590** | |
 
 Además, las del docente: `pc-race` (126, en el entorno con `--pc-race`) y la herramienta AprilTag (24 con `-k "not tag25h9 and not tag16h5"`).
 
@@ -255,7 +264,7 @@ Preguntas para el docente que siguen abiertas (`referencia_del_reto.md` §15 las
 | 1.1 Diagnóstico del ROSCar | Herramientas listas (`diagnostico_roscar`, `preflight`, registro, análisis, procedimiento). **Pendiente:** correrlas en el robot |
 | 1.2 Planificación y ejecución | Planificador y ejecutor hechos (simulados). **Pendiente:** adaptador ROS 2, medir pausa y asentamiento |
 | 1.3 Visión y localización | Medición del tag, calibración de cámara, conversión cámara → dock y reset de pose hechos (simulados). **Pendiente:** medir el montaje de la cámara y probar con ROS real el nodo de cámara y el del TF `map → odom` (escritos, **sin probar con ROS**) |
-| 1.4 Acople y calibración adaptativa | Lógica del acople y estimadores `cd`/`ca` hechos. **Pendiente:** la máquina de estados del pit |
+| 1.4 Acople y calibración adaptativa | Acople fino, calibración por tramo y estimadores `cd`/`ca` hechos (simulados; ensayo con el robot preparado, sin ejecutar). **Pendiente:** la máquina de estados del pit |
 | 1.5 Autonomía y seguridad | Condiciones de aborto del ejecutor. **Pendiente:** verificar `twist_mux` y la parada |
 | 1.6 Tablero web y registro | Sin iniciar (solo constructores de mensajes y plantillas de evidencia) |
 | 2.1 Diagnóstico del JetCobot | Scripts listos (sin brazo) |

@@ -1,5 +1,7 @@
 # ROSCar GranPrix — inicio v0.1 experimental (con mejoras v0.2 del 24-nov)
 
+> **Nota (26-nov):** el planificador, el ejecutor y los estimadores `cd`/`ca` definitivos ahora están en `carrito/granprix_carrito/` (ver `carrito/README.md`). `matematica.py` queda como referencia histórica; los diagnósticos, el registro de mediciones y `prueba_movimiento.py` de esta carpeta siguen vigentes.
+
 Grupo 8. Código provisional independiente de `granprix-esan`, aún pendiente. No reemplaza driver, agente microROS, odom_corrector ni firmware. Basado en algoritmos de las secciones 3 y 7 del HTML oficial. No incluye aún vigilancia MQTT, visión, acople, reset TF ni FSM; no es apto para la tanda.
 
 ## Instalación

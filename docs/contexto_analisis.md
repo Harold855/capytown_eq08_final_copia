@@ -263,7 +263,7 @@ Revisado el 24-nov-2026. El docente indicó que su repositorio **manda** sobre e
 |---|---|---|
 | `pc-race/` (Race Control: dominio, ledger SQLite, gateway MQTT, API web, tablero del juez, simulador de carritos) | Pasos 1 a 4 hechos | 126 pruebas pasan y `ruff` sale limpio. No corrí `mypy` ni el simulador (no hay Mosquitto en el entorno) |
 | `docs/arquitectura/00` a `04` | Escritos | Contrato, Race Control, estación, carrito y despliegue por SSH |
-| `estacion/herramientas/herramienta_apriltag.py` | Hecha | Sus pruebas abortaron en mi entorno al crear el detector (`pupil_apriltags`); causa desconocida. El propio repositorio dice que falta probarla con cámara real |
+| `estacion/herramientas/herramienta_apriltag.py` | Hecha | Con `tag36h11` (la familia del reto) sus 24 pruebas pasan. La prueba parametrizada con `tag25h9` aborta el proceso por corrupción de memoria de `pupil-apriltags 1.0.4` (causa interna sin investigar; no afecta al reto). El propio repositorio dice que falta probarla con cámara real. Ver `docs/apriltag_sin_robot.md` |
 | Supervisor, plantilla del equipo, código del carrito, `BrazoJetCobot` | **Pendiente** | No existen |
 | Guardián, `dock_frames.yaml`, `deploy`, validador de evidencia | **No aparecen** | Tampoco hay menciones |
 

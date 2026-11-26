@@ -2,7 +2,7 @@
 
 **Proyecto final de Robótica – CapyTown**
 
-> **Estado (24-nov-2026): planificación inicial.** Aún no hay código del carrito ni de la estación, ni corridas reales del GranPrix. El docente publicó [`codeplai/GranPrix`](https://github.com/codeplai/GranPrix) (parcial: Race Control, herramienta AprilTag y documentos de arquitectura) y **manda sobre el HTML** en lo que programa cada parte. Los valores marcados como *propuesto* o *histórico* deben comprobarse antes de usarse. Detalle en [`docs/contexto_analisis.md`](docs/contexto_analisis.md) y [`contexto_division_reto_final.md`](contexto_division_reto_final.md).
+> **Estado (26-nov-2026): lógica y pruebas sin robot.** Hay código en Python puro para el carrito (planificador, ejecutor de movimiento, estimadores `cd` y `ca`), la estación (estrategia con brazo simulado), la configuración YAML, el contrato MQTT y la visión (medición de AprilTag y calibración de cámara), con 333 pruebas automáticas que pasan. **Nada se ha ejecutado todavía contra el ROSCar, un JetCobot, una cámara real, ROS 2 ni un broker real**, y faltan los nodos ROS 2, la máquina de estados del pit y el tablero. Qué existe, con qué evidencia y qué falta: [`docs/desarrollo_realizado.md`](docs/desarrollo_realizado.md); arquitectura en [`docs/arquitectura.md`](docs/arquitectura.md) y requisitos en [`docs/requerimientos.md`](docs/requerimientos.md). El docente publicó [`codeplai/GranPrix`](https://github.com/codeplai/GranPrix) (parcial: Race Control, herramienta AprilTag y documentos de arquitectura) y **manda sobre el HTML** en lo que programa cada parte. Los valores marcados como *propuesto* o *histórico* deben comprobarse antes de usarse. Detalle en [`docs/contexto_analisis.md`](docs/contexto_analisis.md) y [`contexto_division_reto_final.md`](contexto_division_reto_final.md).
 >
 > **Precedencia de fuentes:** (1) lo que el docente indique por escrito; (2) su repositorio; (3) el HTML oficial, que sigue siendo la referencia de las reglas de carrera, la rúbrica (a confirmar) y la predicción firmada. Donde el repositorio y el HTML difieren, este README lo señala.
 
@@ -261,16 +261,18 @@ Se reutilizarán componentes de los retos previos, pero **no** se copian proyect
 
 ## 16. Organización del repositorio
 
-- `carrito/`: nodos del equipo (`control_odometria`, `camara_apriltag`, `maquina_pit`) y la extensión del tablero. **No se copian ni se reescriben** los nodos del curso (`puente_mqtt`, `vigilante_red`, `grabador`).
-- `estacion/`: la estrategia de cambio de pieza (`app_equipo`). El supervisor es del curso.
-- `vendor/`: repositorio del curso como submódulo, **sin modificar**. Falta confirmar si `codeplai/GranPrix` es el submódulo esperado antes de crear `.gitmodules`.
-- `simulacion/`: simulaciones y predicciones.
-- `scripts/`: automatización y diagnóstico.
-- `tests/`: pruebas unitarias y de integración (primero contra `pc-race` y su simulador de carritos).
-- `experimentos/`: pruebas experimentales, separadas de la evidencia oficial.
-- `docs/`: documentación técnica. Incluye `contexto_analisis.md`.
+- `carrito/`: la lógica del ROSCar en Python puro (`granprix_carrito/`: docks, planificador, ejecutor, estimadores, configuración; `config/`). Todavía **no** son los nodos ROS 2 del equipo (`control_odometria`, `camara_apriltag`, `maquina_pit`). **No se copian ni se reescriben** los nodos del curso (`puente_mqtt`, `vigilante_red`, `grabador`).
+- `estacion/`: la estrategia de cambio de pieza (`app_equipo`), con brazo simulado. El supervisor es del curso.
+- `vision/`: medición de AprilTag con la herramienta del docente y calibración de la cámara (regla y damero).
+- `integracion/`: configuración MQTT (`mqtt.yaml`) y su lector. `comun/`: cargador YAML estricto. `geometria_dock/`: transformaciones 2D compartidas.
+- `vendor/`: copia fija del repositorio del curso (`codeplai/GranPrix`, commit `285c829`), **sin modificar**; no es un submódulo (ver `vendor/README.md`). Falta confirmar con el docente si debe serlo.
+- `simulacion/`: modelo del simulador del HTML, barridos de parámetros e imágenes sintéticas.
+- `scripts/`: preparación del entorno, pruebas, diagnósticos (ROSCar, JetCobot), calibración de cámara y copias históricas de RC-0 y RC-1.
+- `tests/`: 333 pruebas propias en ocho carpetas (una por paquete); las del contrato corren contra los modelos del docente.
+- `experimentos/`: pruebas experimentales, separadas de la evidencia oficial (hoy solo plantillas).
+- `docs/`: documentación técnica; el índice está en [`docs/README.md`](docs/README.md).
 - `contexto_division_reto_final.md`: reparto del equipo, prioridades y plan por ventanas.
-- `videos/` y `bags/`: evidencia de la tanda.
+- `videos/` y `bags/`: evidencia de la tanda (aún no existen).
 
 **Entorno de desarrollo:** `bash scripts/preparar_entorno.sh` y `bash scripts/ejecutar_pruebas.sh` (detalle en [`docs/entorno_desarrollo.md`](docs/entorno_desarrollo.md)). **Configuraciones YAML** (carrito, estación, MQTT): [`docs/configuracion.md`](docs/configuracion.md). **AprilTag sin robot:** [`docs/apriltag_sin_robot.md`](docs/apriltag_sin_robot.md); **calibrar la cámara en el laboratorio:** [`docs/procedimiento_calibracion_camara.md`](docs/procedimiento_calibracion_camara.md) (regla y tag) y, si el lente distorsiona, [`docs/procedimiento_calibracion_damero.md`](docs/procedimiento_calibracion_damero.md).
 

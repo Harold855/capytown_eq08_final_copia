@@ -13,7 +13,7 @@ estacion/
     posiciones.py          carga y valida poses enseñadas; sin valores por defecto
     estrategia.py          EstrategiaCambio: valida, compensa y ejecuta los pasos
     brazo_simulado.py      brazo y reloj falsos para pruebas y estimación de tiempo
-  configuracion.py       carga estacion.yaml: tolerancias, tope de tiempo y geometría (no puede aflojar el reto)
+    configuracion.py       carga estacion.yaml: tolerancias, tope de tiempo y geometría (no puede aflojar el reto)
   config/estacion.yaml          parámetros de la estrategia y geometría (SUPUESTOS marcados)
   config/poses.plantilla.yaml   plantilla con null: nada se mueve hasta enseñar las poses
 geometria_dock/transformaciones.py   transformaciones 2D (compartidas con el carrito)

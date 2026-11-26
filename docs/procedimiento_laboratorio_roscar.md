@@ -35,7 +35,7 @@ ros2 topic info /cmd_vel -v          # nadie más publicando (teleop_key cerrado
 ros2 topic hz /odom                  # ≈ 11 Hz en RC-0/RC-1
 ros2 topic echo /battery --once
 ```
-Con nuestro repositorio: `bash scripts/roscar_v01/preflight.sh`.
+Con nuestro repositorio: `bash scripts/roscar_v01/preflight.sh` y `python3 scripts/roscar_v01/diagnostico_roscar.py` (da un veredicto OK/AVISO/FALLA; no seguir si hay FALLA).
 
 ## 6. Errores que ya ocurrieron
 1. **Cortar el nodo antes de que termine** (Ctrl+C o `timeout`): el robot conservó la última orden y siguió girando. Siempre publicar ceros a continuación y tener a alguien en el interruptor.

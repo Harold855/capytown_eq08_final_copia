@@ -40,6 +40,7 @@ Revisar diagnóstico; adaptar al robot real (tópicos, cámara, batería, TF y w
 | `registrar_medicion.py` | Añade una fila **validada** a `mediciones_fisicas.csv` (rechaza centímetros donde van metros). Con `--auto` toma lo comandado y lo odométrico de la última corrida de `prueba_movimiento.py`; tú solo das lo medido con cinta y transportador |
 | `analizar_movimientos.py` | Resume físico/comandado, físico/odometría y dispersión por modo, superficie y velocidad. Da una estimación inicial de `cd` y `ca`; **no aplica nada** |
 | `mensajes_contrato.py` | Constructores de los mensajes del carrito según el contrato del docente (`dth` en grados, tópicos `eq08`). Se prueban contra `vendor/granprix/pc-race/contrato` |
+| `diagnostico_roscar.py` | Diagnóstico de **solo lectura** con veredicto OK/AVISO/FALLA: entorno ROS, `/YB_Car_Node`, un solo `/odom_corrector`, `/cmd_vel`, publicadores de `/odom`, frecuencia de `/odom`, `/imu` y `/scan`, batería, calibración activa (identifica si coincide con la de RC-1, la de otro grupo o la equivocada), cámara, disco y hora. Complementa a `preflight.sh`, que vuelca datos sin juzgarlos. `--simular ok|mal` lo prueba sin robot |
 | `../ejecutar_pruebas.sh` | Ejecuta todas las pruebas de software y devuelve código distinto de 0 si algo falla |
 | `matematica.giro_medido` | Giro con signo normalizado, para medir giros que cruzan ±π |
 
@@ -49,7 +50,7 @@ Cambios en lo anterior: `prueba_movimiento.py` acepta `--topic-cmd` y `--topic-o
 
 ## Flujo de una corrida de caracterización (día con robot)
 
-1. `bash scripts/roscar_v01/preflight.sh` (dentro del contenedor con ROS 2) y revisar el archivo generado.
+1. `bash scripts/roscar_v01/preflight.sh` y `python3 scripts/roscar_v01/diagnostico_roscar.py --r-esperado <r> --b-eff-esperado <b>` (dentro del contenedor con ROS 2, con el bringup en marcha). Revisar los archivos generados; no seguir si hay FALLA.
 2. Solo cálculo: `python3 scripts/roscar_v01/prueba_movimiento.py recta --distancia 0.25`.
 3. Con autorización y zona segura: la misma orden con `--ejecutar --zona-segura`.
 4. Medir con cinta (recta) o transportador (giro) y registrar: `python3 scripts/roscar_v01/registrar_medicion.py recta --robot <id> --superficie <p. ej. carton_elevado> --corrida 1 --auto --distancia-fisica 0.245 --desvio-lateral-cm 1.2`.

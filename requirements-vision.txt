@@ -4,3 +4,4 @@
 opencv-python-headless>=4.8   # >=4.7 trae cv2.aruco con los diccionarios AprilTag; "headless" basta (sin ventanas)
 numpy
 pupil-apriltags               # librería nativa: aborta con otras familias (tag25h9) mezcladas en un proceso; el reto usa tag36h11
+pyyaml>=6                     # guardar y leer camara_calibrada.yaml

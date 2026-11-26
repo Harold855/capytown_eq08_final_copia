@@ -105,12 +105,8 @@ class TestSensibilidadALaCalibracion(unittest.TestCase):
     """Lo que más puede estropear la medición real: la distancia z depende de la focal y del tamaño impreso."""
 
     def medir_con(self, fov_real, fov_supuesto, lado_real=0.06):
-        original = s.LADO_IMAGEN_M
-        s.LADO_IMAGEN_M = lado_real * (s.CELDAS_TAG + 2 * ht.MARGEN_CELDAS) / s.CELDAS_TAG
-        try:
-            img = escena(fov=fov_real, t=(0.0, 0.0, 0.28))
-        finally:
-            s.LADO_IMAGEN_M = original
+        img = s.renderizar(3, s.rot_y(0.0), (0.0, 0.0, 0.28), 640, 480, fov_real, desenfoque_px=0.8, ruido=3.0,
+                           semilla=1, tamano_m=lado_real)
         d = ht.detectar_en(s.detector(), img, s.parametros_camara(640, 480, fov_supuesto), s.TAMANO_M)[0]['pose']
         return abs(d['z'] - 0.28) * 100   # cm
 

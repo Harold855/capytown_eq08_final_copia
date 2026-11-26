@@ -42,12 +42,24 @@ La herramienta del docente aproxima la cámara con `--fov-h` (sin distorsión) y
 - **Falsas aceptaciones** con el entorno real (otras marcas, reflejos). La herramienta informa `hamming` y `margen` pero no hay umbral decidido.
 - **Rendimiento** en la Raspberry Pi 5 y en la Jetson (la frecuencia de detección).
 
+## La distorsión del lente solo se ve fuera del eje
+Probado en simulación con distorsión de barril (`k1`) y el método de calibración con regla: la focal ajustada y el error del ajuste **no cambian** (rms ≈ 0.03 cm), y con el tag centrado la validación es perfecta. El error de `z` aparece al desplazar el tag hacia los lados:
+
+| `k1` | tag centrado | a 6 cm del centro | a 10 cm del centro |
+|---|---|---|---|
+| 0 (sin distorsión) | 0.06 cm | 0.05 cm | 0.07 cm |
+| −0.1 | 0.10 cm | 0.20 cm | 0.38 cm |
+| −0.25 | 0.08 cm | 0.48 cm | 1.02 cm |
+| −0.4 | 0.09 cm | 0.73 cm | 1.62 cm |
+
+(error máximo de `z` validando con distancias nuevas de 18 a 36 cm). Por eso el procedimiento exige validar con el tag a los lados a la misma distancia: el rms del ajuste no avisa.
+
 ## Aviso: la librería nativa aborta con otras familias
 Con `pupil-apriltags 1.0.4` la prueba parametrizada del docente con `tag25h9` aborta el proceso (`malloc(): mismatching next->prev_size`, corrupción de memoria). Con `tag25h9` sola en un proceso limpio funciona, así que parece ocurrir al mezclar familias o detectores en el mismo proceso [Probable; sin investigar la causa]. **No afecta al reto** (usa `tag36h11`), pero: no crear varios `Detector` ni mezclar familias en un nodo. `simulacion/apriltag_sintetico.py` usa un solo detector por proceso. Esto explica el aborto que vi antes al probar la herramienta.
 
 ## Qué falta para cerrar la visión (necesita el laboratorio)
 1. Imprimir el tag al 100 % y medir su lado con regla.
-2. Calibrar la cámara del ROSCar (damero, ~20 imágenes) o ajustar la focal con distancias medidas.
+2. Calibrar la cámara del ROSCar: `scripts/camara/calibrar_focal.py` ya está hecho y probado con una cámara sintética (ajusta focal y offset de la regla con el tag a varias distancias y lo valida también fuera del eje); falta usarlo con la cámara real. Procedimiento: [`procedimiento_calibracion_camara.md`](procedimiento_calibracion_camara.md). Si el lente distorsiona, hará falta un damero (script sin hacer).
 3. Medir la pose del tag a distancias y ángulos conocidos con regla y transportador, y comparar con la simulación.
 4. Medir el montaje de la cámara y recibir/definir el marco del dock.
 5. Decidir umbrales de `margen` y `hamming` con datos reales.

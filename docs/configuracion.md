@@ -40,7 +40,7 @@ Quién necesita qué: el carrito usa `movimiento` y `calibracion`; la estación 
 | Archivo previsto en la división | Motivo |
 |---|---|
 | `dock_frames.yaml` | no existe el del docente y la división dice no fijar un esquema ficticio. Los supuestos de marcos quedan marcados en `estacion.yaml` |
-| `camara.yaml` | necesita la calibración de la cámara y no hay código de cámara aún; sería una plantilla vacía sin lector |
+| `camara.yaml` (semilla editable) | no hay valores que inventar. Existe `camara_calibrada.yaml`, un **resultado** que genera `scripts/camara/calibrar_focal.py` y lee `vision.calibracion_focal.cargar_camara` (procedimiento en `docs/procedimiento_calibracion_camara.md`); queda en la carpeta del experimento, no en `config/` |
 | `almacenes.yaml`, `manipulacion.yaml`, `estacion.yaml` del JetCobot (inventario) | dependen de medir el montaje real y de la tabla de alcance; sus datos serían inventados |
 | `caracterizacion.yaml`, `metadata.yaml` | son **resultados** de los experimentos, no configuración: los genera cada experimento |
 | `roles.yaml` | los cuatro roles ya son una tabla fija del reto en `roles.py`; moverla a YAML permitiría editarla por error |

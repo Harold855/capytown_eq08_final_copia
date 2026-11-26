@@ -34,6 +34,7 @@ Qué hay y cuándo leerlo. Los documentos están agrupados por lo que se necesit
 | [`apriltag_sin_robot.md`](apriltag_sin_robot.md) | Qué se puede probar sin robot, cifras de precisión, el efecto de la calibración y de la distorsión |
 | [`procedimiento_calibracion_camara.md`](procedimiento_calibracion_camara.md) | Calibrar la focal con regla y tag (primero) y validarla fuera del eje |
 | [`procedimiento_calibracion_damero.md`](procedimiento_calibracion_damero.md) | Calibrar con damero, incluida la distorsión (solo si lo anterior falla fuera del eje) |
+| [`tablero_y_evidencia.md`](tablero_y_evidencia.md) | Eventos, métricas, verificador de evidencia (video, rosbag2, CSV), registro experimental y panel del tablero |
 | [`mision.md`](mision.md) | Máquina de la misión: estados, vueltas y piezas, seguridad de nuestra lógica, interfaz ROS 2, plazos y lo que mostró la simulación |
 | [`acople.md`](acople.md) | Acople fino con el tag y calibración por tramo: ciclo, salvaguardas, cómo se alimenta el estimador, scripts de ensayo y lo que mostró la simulación |
 | [`marcos_y_reset_pose.md`](marcos_y_reset_pose.md) | Pasar la pose del tag a pose del robot en el dock y en el mapa, reset de pose, cómo medir el montaje de la cámara y cuánto pesa cada error |

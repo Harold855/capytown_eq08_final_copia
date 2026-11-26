@@ -88,7 +88,7 @@ class Mundo:
     def __init__(self, cfg_mision: Optional[ConfigMision] = None, cd: float = 1.01, ca: float = 1.09, t_cambio: float = 5.8,
                  escalas_ini: Tuple[float, float] = (1.0, 1.0), ruido_mov: float = 0.01, ruido_tag_m: float = 0.002,
                  ruido_tag_deg: float = 0.25, semilla: int = 0, cfg_acople: Optional[ConfigAcople] = None,
-                 reset_tras_intentos: int = 0, odom_ok: Optional[Callable[[], bool]] = None) -> None:
+                 reset_tras_intentos: int = 0, odom_ok: Optional[Callable[[], bool]] = None, eventos=None) -> None:
         mov, est = cargar_carrito()
         self.cfg_mision = cfg_mision or cargar_mision()
         self.cfg_acople = cfg_acople or cargar_acople(None, mov)
@@ -101,7 +101,7 @@ class Mundo:
         self.mision = Mision(self.cfg_mision)
         medidor = MedidorTag(lambda: self.t, lambda s: None)
         self.fsm = MaquinaPit(self.mision, mov, self.cfg_acople, CalibradorTramo(estimador), medidor, self.planta, self.puerto,
-                              lambda: self.t, lambda: 1.7e9 + self.t, odom_ok)
+                              lambda: self.t, lambda: 1.7e9 + self.t, odom_ok, eventos)
         self.tag_visto, self.tag_activo, self.vel = 0, True, []
         publicar = self.planta.publicar
 

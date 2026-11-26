@@ -10,7 +10,6 @@ Solo lee: no mueve nada. Salida 0 si pudo analizar, 1 si el archivo falta o no t
 """
 import argparse
 import csv
-import math
 import sys
 from collections import Counter
 from pathlib import Path
@@ -19,6 +18,7 @@ from xml.sax.saxutils import escape
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from carrito.granprix_carrito.calibracion import evaluar_reduccion  # noqa: E402
 from carrito.granprix_carrito.calibracion_tramo import CAMPOS_PARADAS  # noqa: E402
+from carrito.granprix_carrito.metricas import percentil  # noqa: E402
 
 
 def _num(x):
@@ -35,11 +35,6 @@ def leer(ruta):
         if faltan:
             raise ValueError(f'faltan columnas en el CSV: {", ".join(faltan)}')
         return list(lector)
-
-
-def percentil(valores, q=0.95):
-    v = sorted(valores)
-    return v[min(len(v) - 1, max(0, math.ceil(round(len(v) * q, 9)) - 1))] if v else None  # rango más cercano
 
 
 def estadisticas(filas):

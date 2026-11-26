@@ -6,7 +6,7 @@
 set -u
 cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 1
 rc=0
-for d in tests/roscar_v01 tests/integracion tests/geometria_dock tests/estacion tests/jetcobot_v01 tests/carrito tests/comun tests/vision; do
+for d in tests/roscar_v01 tests/integracion tests/geometria_dock tests/estacion tests/jetcobot_v01 tests/carrito tests/evidencia tests/comun tests/vision; do
   [ -d "$d" ] || continue
   echo "=== $d"
   python3 -m unittest discover -s "$d" -v 2>&1 | tail -n 6

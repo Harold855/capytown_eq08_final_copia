@@ -74,6 +74,9 @@ carrito.granprix_carrito
   calibracion_tramo-> acople, calibracion, planificador, pose_dock, geometria_dock
   mision           -> configuracion, docks, comun
   maquina_pit      -> acople, calibracion_tramo, configuracion, docks, ejecutor, mision, planificador, pose_dock, geometria_dock
+  eventos_mision   (sin dependencias)
+  cronometro       -> eventos_mision
+  metricas         -> cronometro, calibracion, calibracion_tramo, eventos_mision, mision
   nodos/adaptador_ros   -> maquina_pit, acople, calibracion_tramo, mision, pose_dock, transformacion_camara_dock, gestor_reset   (rclpy solo dentro de _clase_nodo)
   nodos/nodo_reset_pose -> gestor_reset, transformacion_camara_dock, pose_dock, reset_pose          (rclpy)
   nodos/tag_emulado     -> gestor_reset, transformacion_camara_dock, docks                         (rclpy solo dentro de _clase_nodo)
@@ -96,6 +99,13 @@ vision
   calibrar              -> herramienta, calibracion_focal
   calibracion_damero    -> herramienta, calibracion_focal
   medicion              -> herramienta, calibracion_focal      (CamaraTag, agregar, FiltroMediana, evidencia)
+
+evidencia
+  registro_experimental (sin dependencias)
+  verificar_evidencias  -> comun, registro_experimental, carrito.eventos_mision
+  archivos_falsos       -> carrito.mision, comun
+tablero
+  datos_simulados       -> carrito.metricas, evidencia, simulacion.mision_simulada
 
 simulacion
   modelo_granprix       -> carrito.docks, carrito.planificador, geometria_dock

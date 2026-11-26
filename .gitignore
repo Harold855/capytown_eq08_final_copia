@@ -16,3 +16,6 @@ log/
 .env
 *.key
 *.pem
+
+# Datos generados por tablero/datos_simulados.py
+tablero/datos/

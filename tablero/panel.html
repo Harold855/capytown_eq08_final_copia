@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel de misión ROSCar</title>
+<link rel="stylesheet" href="panel.css">
+</head>
+<body>
+<header>
+  <h1>Panel de misión · eq08</h1>
+  <span id="fuente" class="chip"></span>
+  <span id="estado" class="chip grande"></span>
+  <span id="edad" class="tenue"></span>
+  <button id="estop" class="estop" type="button" title="Parada de emergencia (requiere ?api=)">E-STOP</button>
+</header>
+<p id="aviso" class="aviso" role="alert" hidden></p>
+<main>
+  <section id="control"><h2>Control</h2>
+    <div class="botones">
+      <button type="button" data-orden="iniciar">Iniciar</button>
+      <button type="button" data-orden="reset_carrito">Reset carrito</button>
+      <button type="button" data-orden="reiniciar_vuelta">Reiniciar vuelta</button>
+    </div>
+    <p class="tenue" id="api"></p>
+  </section>
+  <section id="crono"><h2>Cronometraje</h2><div id="crono-resumen" class="kv"></div><table id="vueltas"></table></section>
+  <section id="estaciones"><h2>Estaciones</h2><div id="est-grid" class="grid4"></div></section>
+  <section id="carrito"><h2>Carrito</h2><div id="carrito-kv" class="kv"></div></section>
+  <section id="banderas"><h2>Banderas e intervenciones</h2><div id="banderas-kv" class="kv"></div><ul id="bitacora" class="lista"></ul></section>
+  <section id="pits"><h2>Pits y precisión</h2><div id="pits-kv" class="kv"></div></section>
+  <section id="evidencia"><h2>Evidencia</h2><div id="evidencia-kv" class="kv"></div><ul id="evidencia-lista" class="lista"></ul></section>
+  <section id="eventos" class="ancho"><h2>Eventos recientes</h2><ul id="eventos-lista" class="lista mono"></ul></section>
+</main>
+<script src="datos/datos.js"></script>
+<script src="panel.js"></script>
+</body>
+</html>

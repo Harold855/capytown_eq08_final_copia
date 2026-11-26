@@ -13,6 +13,7 @@ Todo lo externo entra por `recibir_*` y toda salida hacia el curso sale por el `
 from __future__ import annotations
 
 import time
+from dataclasses import asdict
 from enum import Enum
 from typing import Callable, Dict, Optional, Protocol, Tuple
 
@@ -22,6 +23,7 @@ from .acople import ConfigAcople, MedidorTag, ResultadoAcople, acoplar_pasos, mo
 from .calibracion_tramo import CalibradorTramo
 from .configuracion import ConfigMovimiento
 from .docks import DOCKS_HTML
+from .eventos_mision import RegistroEventos
 from .ejecutor import Estado as EstadoMov
 from .ejecutor import EjecutorMovimiento, Salida
 from .mision import Mision, RegistroPit
@@ -116,9 +118,11 @@ class SalidaSegura:
 class MaquinaPit:
     def __init__(self, mision: Mision, mov: ConfigMovimiento, cfg_acople: ConfigAcople, calibrador: CalibradorTramo,
                  medidor: MedidorTag, salida: Salida, puerto: Puerto, reloj: Callable[[], float] = time.monotonic,
-                 reloj_ts: Callable[[], float] = time.time, odom_ok: Optional[Callable[[], bool]] = None) -> None:
+                 reloj_ts: Callable[[], float] = time.time, odom_ok: Optional[Callable[[], bool]] = None,
+                 eventos: Optional[RegistroEventos] = None) -> None:
         self.mision, self.mov, self.cfg_acople, self.calibrador, self.medidor = mision, mov, cfg_acople, calibrador, medidor
         self.puerto, self.reloj, self.reloj_ts, self.odom_ok = puerto, reloj, reloj_ts, odom_ok
+        self.eventos = eventos if eventos is not None else RegistroEventos(reloj_ts)
         self.entorno = Entorno()
         self.seg = Seguridad(mision, self.entorno, reloj)
         self.raw = salida
@@ -134,16 +138,24 @@ class MaquinaPit:
                              E.SALIENDO: self._saliendo}
 
     # ------------------------------------------------------------------ entradas
+    def _entrada(self, campo: str, antes: object, ahora: object) -> None:
+        if antes != ahora:
+            self._ev('entrada', campo=campo, antes=antes, ahora=ahora)
+
     def recibir_turno(self, autorizado: bool) -> None:
+        self._entrada('turno', self.entorno.autorizado, bool(autorizado))
         self.entorno.autorizado = bool(autorizado)
 
     def recibir_bandera(self, bandera: str) -> None:
+        self._entrada('bandera', self.entorno.bandera, bandera)
         self.entorno.bandera = bandera
 
     def recibir_enlace(self, ok: bool) -> None:
+        self._entrada('enlace', self.entorno.enlace, bool(ok))
         self.entorno.enlace, self.entorno.t_enlace = bool(ok), self.reloj()
 
     def recibir_estacion(self, estacion: int, estado: str) -> None:
+        self._entrada(f'estacion{estacion}', self.entorno.estaciones.get(estacion), estado)
         self.entorno.estaciones[estacion] = estado
 
     def recibir_tag(self, pose: PoseDock) -> None:
@@ -152,8 +164,10 @@ class MaquinaPit:
     def recibir_resultado(self, estacion: int, ok: bool, pieza_dejo: Optional[str]) -> bool:
         if self.estado is not E.ESPERANDO_RESULTADO or estacion != self.mision.estacion or self._res is not None:
             self.ignorados += 1
+            self._ev('ignorado', estacion_resultado=estacion, ok=ok)
             return False
         self._res = (bool(ok), pieza_dejo)
+        self._ev('resultado', ok=bool(ok), pieza_dejo=pieza_dejo)
         return True
 
     def parar(self, motivo: str = 'PARADA_MANUAL') -> None:
@@ -214,10 +228,24 @@ class MaquinaPit:
     def _debe_parar(self) -> bool:
         return not self.seg.puede_mover(self.estado)
 
+    def _ev(self, tipo: str, motivo: Optional[str] = None, estacion: Optional[int] = None, vuelta: Optional[int] = None,
+            fila: Optional[dict] = None, **datos: object) -> None:
+        try:
+            self.eventos.registrar(tipo, self.estado.value, vuelta or min(self.mision.vuelta, self.mision.cfg.vueltas),
+                                   estacion or self.mision.estacion, motivo, {**(fila or {}), **datos})
+        except Exception:          # registrar nunca debe detener al robot
+            pass
+
+    def _aviso(self, nivel: str, texto: str) -> None:
+        self._ev('aviso', nivel=nivel, texto=texto)
+        self.puerto.aviso(nivel, texto)
+
     def _ir(self, nuevo: Estado) -> None:
         if nuevo is not E.FALLA and nuevo not in TRANSICIONES[self.estado]:
             raise RuntimeError(f'transición no permitida: {self.estado.value} -> {nuevo.value}')
+        antes = self.estado
         self.estado, self.t_estado = nuevo, self._t
+        self._ev('estado', de=antes.value)
 
     def _plazo(self, t: float) -> Optional[str]:
         ti = self.mision.cfg.tiempos
@@ -237,17 +265,19 @@ class MaquinaPit:
         try:
             self.raw.publicar(0.0, 0.0)
         except Exception as ex:
-            self.puerto.aviso('error', f'no se pudo publicar el cero: {ex}')
+            self._aviso('error', f'no se pudo publicar el cero: {ex}')
         if self._reg is not None and self._reg.valido is None:
             self._reg.valido, self._reg.motivo = False, motivo
         self.motivo = motivo
         self._ir(E.FALLA)
-        self.puerto.aviso('error', f'FALLA: {motivo}')
+        self._ev('falla', motivo)
+        self._aviso('error', f'FALLA: {motivo}')
 
     # ------------------------------------------------------------------ estados
     def _espera(self, t: float) -> None:
         if self.seg.motivo() is None:
             self.entorno.t_inicio = t
+            self._ev('inicio')
             self._entrar_pit(t)
 
     def _entrar_pit(self, t: float) -> None:
@@ -280,6 +310,8 @@ class MaquinaPit:
                 pos, ang = pose.error
                 setattr(reg, f'err_pos_{lado}_m', pos)
                 setattr(reg, f'err_ang_{lado}_deg', ang)
+        self._ev('acople', res.motivo, correcciones=res.correcciones, exito=res.exito, err_pos_pre_m=reg.err_pos_pre_m,
+                 err_pos_post_m=reg.err_pos_post_m, duracion_s=res.duracion_s)
         if not res.exito:
             self._fallar(f'ACOPLE_{res.motivo}')
         else:
@@ -289,6 +321,7 @@ class MaquinaPit:
         if self.seg.intercambio():
             return
         self.puerto.solicitud(self.mision.estacion, self._acople.pose_final, self.mision.pieza_trae)
+        self._ev('solicitud', pieza_trae=self.mision.pieza_trae, **self._acople.pose_final.a_contrato())
         self.entorno.intercambio = True
         self._ir(E.ESPERANDO_RESULTADO)
 
@@ -312,13 +345,13 @@ class MaquinaPit:
                 return
             self._post_omitida = self._post is None
             if self._post_omitida:
-                self.puerto.aviso('aviso', 'sin segunda medición del tag: se usa la última del acople')
+                self._aviso('aviso', 'sin segunda medición del tag: se usa la última del acople')
         if not self._reset_listo and t >= self._reset_desde:
             if not self._reset_pedido:
                 if self.puerto.pedir_reset():
                     self._reset_pedido = True
                 else:
-                    self.puerto.aviso('aviso', 'reset de pose no disponible: se sigue sin él')
+                    self._aviso('aviso', 'reset de pose no disponible: se sigue sin él')
                     self._reset_listo = True
                 return
             r = self.puerto.resultado_reset()
@@ -329,8 +362,9 @@ class MaquinaPit:
                 self._reset_n += 1
                 self._reset_desde = t + ti.reset_espera_s
                 return
+            self._ev('reset', r[1], aceptado=r[0], intentos=self._reset_n + 1)
             if not r[0]:
-                self.puerto.aviso('aviso', f'reset de pose rechazado: {r[1]}')
+                self._aviso('aviso', f'reset de pose rechazado: {r[1]}')
             self._reset_listo = True
         if self._reset_listo:
             self._cerrar_pit()
@@ -344,24 +378,30 @@ class MaquinaPit:
         self._pose_salida = final.mapa
         ok, pieza = self._res
         pit, vuelta = m.cerrar_pit(ok, pieza, ts)
+        self._ev('pit_cerrado', pit.motivo, estacion=est, vuelta=pit.vuelta, valido=pit.valido, pieza_recibida=pieza)
         if pit.valido:
             self.pieza = pieza
             self.puerto.evento('pit_ok', est)
         else:
-            self.puerto.aviso('aviso', f'pit E{est} con {pit.motivo}: esperada {pit.pieza_esperada!r}, recibida {pieza!r}')
+            self._aviso('aviso', f'pit E{est} con {pit.motivo}: esperada {pit.pieza_esperada!r}, recibida {pieza!r}')
         if vuelta is not None:
+            self._ev('vuelta', vuelta=vuelta.numero, numero=vuelta.numero, t_inicio=vuelta.t_inicio, t_fin=vuelta.t_fin,
+                     estaciones=list(vuelta.estaciones))
             self.puerto.vuelta(vuelta.numero, vuelta.t_inicio, vuelta.t_fin, vuelta.estaciones)
         self._ir(E.SALIENDO)
 
     def _medir_pit(self, t: float) -> None:
         self._reg.t_pit_s = t - self._t_freno
+        fila = asdict(self._reg)
+        self._ev('pit', estacion=fila['estacion'], vuelta=fila['vuelta'], fila=fila)
         self.pits_lentos += self._reg.t_pit_s > self.mision.cfg.tiempos.pit_max_s
 
     def _saliendo(self, t: float) -> None:
         if self.mision.completa:
             self._medir_pit(t)
             self._ir(E.FIN)
-            self.puerto.aviso('info', 'misión completa')
+            self._ev('fin')
+            self._aviso('info', 'misión completa')
             return
         if self.seg.intercambio():
             return

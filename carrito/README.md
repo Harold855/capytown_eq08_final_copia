@@ -123,6 +123,9 @@ parada = calibrador.cerrar_parada(estacion, res, post=pose_tras_el_intercambio, 
 ## Máquina de la misión (`maquina_pit.py`, `mision.py`)
 `MaquinaPit.paso()` (20 Hz, un hilo) recorre ESPERA → [MIDIENDO → ACOPLANDO → SOLICITANDO → ESPERANDO_RESULTADO → RECALIBRANDO → SALIENDO → NAVEGANDO] × 16 → FIN, o FALLA. Toda velocidad pasa por `SalidaSegura`; lo externo entra por `recibir_*` y las salidas hacia el curso por un `Puerto`. `nodos/adaptador_ros.py` la conecta con ROS 2. Estados, seguridad, interfaz y cifras de simulación: [`docs/mision.md`](../docs/mision.md). `python3 simulacion/mision_simulada.py` corre una misión completa simulada.
 
+## Eventos, cronómetro y métricas
+`MaquinaPit` registra sus eventos (`eventos_mision.py`, JSONL); `cronometro.py` y `metricas.py` calculan vueltas, sectores, pits y precisión desde ellos. Detalle, verificador de evidencia y panel: [`docs/tablero_y_evidencia.md`](../docs/tablero_y_evidencia.md).
+
 ## Verificación
 - **Equivalencia con el HTML oficial:** `simulacion/modelo_granprix.py` usa este planificador y reproduce el `simulate()` original (mismas semillas) en 18 casos y 288 llegadas, con una tolerancia de 1e-9 (`tests/carrito/test_equivalencia_html.py`). La referencia son salidas del JavaScript original ejecutado con Node.js (`tests/carrito/referencia_html.json`).
 - Pruebas en `tests/carrito/` (planificador, docks, equivalencia con el HTML y ejecutor con reloj falso y planta ideal con escalas reales, incluido un lazo cerrado planificador+ejecutor+estimador). Se ejecutan con `bash scripts/ejecutar_pruebas.sh`.

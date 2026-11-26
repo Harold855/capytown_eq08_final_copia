@@ -95,14 +95,14 @@ Bono: +1 por odometría visual documentada (sin pasar de 20). Rige la rúbrica d
 | Nodo de cámara (`camara_apriltag_node.py`) y emulador del tag para el simulador RC-1 (`tag_emulado.py`) | Escritos; **probados solo contra un sustituto de `rclpy`** |
 | Acople fino (`acople.py`) y calibración por tramo (`calibracion_tramo.py`) | Hechos en Python puro; simulados (el ensayo con el robot está preparado, sin ejecutar) |
 | Máquina de la misión (`maquina_pit.py`, `mision.py`) y su nodo ROS 2 (`adaptador_ros.py`) | Hechas; simuladas de punta a punta (4 vueltas); el nodo **probado solo contra un sustituto de `rclpy`** |
-| Tablero web | **Pendiente** |
+| Eventos, cronómetro, métricas, verificador de evidencia, registro experimental y panel del tablero (`tablero/`) | Hechos y probados con datos simulados; el panel es un **prototipo de solo lectura** sin conectar al tablero del curso |
 | Pruebas con los robots reales | **Ninguna todavía** |
 
 ## Cómo empezar
 
 ```bash
 bash scripts/preparar_entorno.sh --vision   # entorno virtual y dependencias
-bash scripts/ejecutar_pruebas.sh            # 682 pruebas; "TODO OK" si pasan
+bash scripts/ejecutar_pruebas.sh            # 791 pruebas; "TODO OK" si pasan
 ```
 
 Detalle del entorno en [`docs/entorno_desarrollo.md`](docs/entorno_desarrollo.md).
@@ -113,8 +113,9 @@ Detalle del entorno en [`docs/entorno_desarrollo.md`](docs/entorno_desarrollo.md
 - `estacion/`: estrategia de cambio de pieza (`app_equipo`) con brazo simulado. El supervisor es del curso.
 - `vision/`: medición del AprilTag y calibración de la cámara. `integracion/`: configuración MQTT. `comun/`, `geometria_dock/`: utilidades compartidas.
 - `simulacion/`: modelo del simulador del HTML, barridos de parámetros e imágenes sintéticas.
+- `evidencia/` y `tablero/`: verificador de evidencia, registro experimental y panel del tablero (prototipo).
 - `scripts/`: entorno, pruebas, diagnósticos (ROSCar, JetCobot), calibración de cámara y copias históricas de RC-0 y RC-1.
-- `tests/`: 682 pruebas propias. `experimentos/`: pruebas de laboratorio, separadas de la evidencia oficial.
+- `tests/`: 791 pruebas propias. `experimentos/`: pruebas de laboratorio, separadas de la evidencia oficial.
 - `vendor/granprix/`: copia fija del repositorio del docente, **sin modificar**.
 - `docs/`: documentación; el índice está en [`docs/README.md`](docs/README.md).
 

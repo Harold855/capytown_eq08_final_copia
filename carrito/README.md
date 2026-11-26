@@ -57,6 +57,42 @@ Detalles que importan:
 
 **Límites que este módulo no puede cubrir:** si el nodo ROS muere, nadie llama a `paso()` y el firmware conserva la última orden. La protección real es el timeout de la entrada de `twist_mux` (verificar en el robot que existe y su valor). Los valores `pausa_s = 0.30` y `asentamiento_s = 0.50` son **placeholders**: hay que medirlos en el robot (retardo de `/odom` 0.5–0.65 s sugiere que 0.5 s se queda corto para leer odometría tras parar). Falta el adaptador ROS 2 (Twist + `/odom` + reloj), que aquí no se puede probar.
 
+## Estimadores de escala (`calibracion.py`)
+`EstimadorEscalas` es el estado de `cd` y `ca` durante la carrera. La fórmula es la del HTML (`c += alpha·(medido/comandado − c)`, `alpha = 0.35`); aquí se añade lo que hace falta para usarla.
+
+```python
+from carrito.granprix_carrito.calibracion import EstimadorEscalas
+est = EstimadorEscalas(robot='g8-roscar')            # o EstimadorEscalas.cargar('calibracion.json', robot_esperado='g8-roscar')
+cmd = pl.comandar(tramo, est.escalas)
+# ... el ejecutor mueve el carrito; antes del acople se mide la pose de llegada con el tag ...
+reg = est.observar(pose_salida_medida, pose_llegada_medida, ej.comando_efectivo(cmd), t=ahora)
+est.escalas, est.convergio(), reg.motivo_cd, reg.motivo_ca
+```
+
+- **Entrada de cada observación:** pose medida al salir del dock anterior, pose medida al llegar **antes** de cualquier acople (`None` si no se vio el tag: se registra como `medicion_invalida` y no cambia nada) y el comando **realmente enviado** (`comando_efectivo`). Una prueba con rampa de aceleración muestra que con el comando nominal `cd` converge sesgado (≈ 1 %) y con el efectivo no.
+- **Rechazos registrados**, escala por escala: tramo menor de 10 cm, giro fuera de 20°–150°, razón medido/comandado fuera de [0.5, 1.5], tag ausente, congelado, velocidad distinta. El paso máximo por actualización es 0.05.
+- **No mezcla velocidades:** la escala vale para la `v` y la `ω` con que se calculó (se fijan con la primera observación usada, o al construir con `v_ref`/`w_ref`). RC-1 midió un giro 7–11 % mayor que el ordenado según ω, así que mezclar velocidades contaminaría `ca`. Mientras el planificador use siempre 0.10 m/s y 0.5 rad/s esto no se nota. *Es una inferencia con pocos datos ([Probable]), no una ley medida.*
+- **`congelar()`** fija las escalas para la tanda oficial (3.5.4) y sigue registrando.
+- **Archivo `calibracion.json`** con el identificador del robot; `cargar` falla si el robot no coincide, si hay valores no finitos o fuera de [0.5, 1.5] o si la versión es desconocida (1.1.4: no aplicar parámetros históricos a otro robot). Escritura atómica. Se usa JSON y no YAML porque no hay PyYAML en el entorno de desarrollo; si el curso fija `calibracion.yaml`, es cambiar el formato del archivo.
+- **`exportar_csv`**: un renglón por observación (razones, escalas antes/después, motivos) para las gráficas del informe.
+- **`evaluar_reduccion`**: fracción de paradas con error posterior menor que el previo (umbral 70 %). Cómo cuenta la rúbrica las paradas que ya estaban dentro de tolerancia **no está confirmado**: la función informa ambas versiones (`excluir_dentro`).
+
+**Sobre alpha** (`python3 simulacion/barrido_alpha.py`, 200 semillas × 4 vueltas, robot simulado con giro +9 % y distancia +1 %, ruido del HTML, métricas en la última vuelta):
+
+| alpha | error de llegada | llegadas válidas | pits para quedar a ±1.5 % en `ca` |
+|---|---|---|---|
+| 0.10 | 6.6 cm | 15 % | 17 |
+| 0.20 | 2.8 cm | 78 % | 9 |
+| **0.35** | **2.6 cm** | **83 %** | 5 |
+| 0.50 | 2.8 cm | 78 % | 3 |
+| 0.70 | 3.0 cm | 73 % | 2 |
+
+Lectura: en este modelo 0.35 es un buen compromiso y no hay motivo para cambiarlo antes de medir. Alpha bajo no alcanza a corregir en las 16 paradas de una carrera de 4 vueltas; alpha alto amplifica el ruido del tag. Pero con 0.35 `ca` tarda en promedio unos 5 pits en estabilizarse, más que una vuelta: **conviene arrancar con las escalas caracterizadas el día 3 y no con 1.0**. Es simulación con el ruido del HTML; el ruido real del tag y el robot real pueden mover estos números.
+
+**Criterio de convergencia** (provisional): al menos 4 actualizaciones usadas y diferencia máxima entre ellas < 0.01. En 300 semillas simuladas no declaró convergencia falsa y la declara entre 8 y 12 pits.
+
+**Lo que no cubre:** la medición de poses (tag), el reset de pose y la secuencia del pit son de otros módulos; aquí se asume que las poses llegan ya medidas y coherentes entre sí. No hay adaptador ROS ni se escribe `calibracion.json` automáticamente: lo decide el nodo que use este módulo.
+
 ## Verificación
 - **Equivalencia con el HTML oficial:** `simulacion/modelo_granprix.py` usa este planificador y reproduce el `simulate()` original (mismas semillas) en 18 casos y 288 llegadas, con una tolerancia de 1e-9 (`tests/carrito/test_equivalencia_html.py`). La referencia son salidas del JavaScript original ejecutado con Node.js (`tests/carrito/referencia_html.json`).
 - Pruebas en `tests/carrito/` (planificador, docks, equivalencia con el HTML y ejecutor con reloj falso y planta ideal con escalas reales, incluido un lazo cerrado planificador+ejecutor+estimador). Se ejecutan con `bash scripts/ejecutar_pruebas.sh`.

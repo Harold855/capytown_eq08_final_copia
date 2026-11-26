@@ -30,7 +30,7 @@ Otros documentos: arquitectura en [`arquitectura.md`](arquitectura.md), requisit
 | Estación (JetCobot) | `estacion/` estrategia, roles, compensación, poses, brazo simulado; `scripts/jetcobot_v01/` | Simulado; **nunca contra un brazo** |
 | Visión sin robot | `vision/`, `simulacion/*sintetico.py`, calibración con regla y con damero, `medir_tag.py` | Simulado (cámara sintética); **nunca con la cámara real** |
 | ROSCar: acople fino y calibración por tramo | `carrito/granprix_carrito/acople.py`, `calibracion_tramo.py`, `config/acople.yaml`, `simulacion/robot_simulado.py`, `scripts/roscar_v01/prueba_acople.py`, `prueba_calibracion_adaptativa.py`, `analizar_acople.py` | Simulado; **el ensayo con el robot está preparado, sin ejecutar** |
-| Pruebas | 590 propias en 8 carpetas | Verificado |
+| Pruebas | 682 propias en 8 carpetas | Verificado |
 | Entorno | `scripts/preparar_entorno.sh`, `requirements-*.txt` | Verificado en Linux, Python 3.13 |
 
 **Lo que NO existe:** nodos ROS 2 del carrito (`control_odometria`, `camara_apriltag`, `maquina_pit`), el adaptador ROS 2 del ejecutor, la máquina de estados del pit, el tablero web, la cinemática y manipulación reales del brazo, y cualquier medición física. La lógica de arriba está lista para conectarse a ellos, pero conectarla es trabajo pendiente.
@@ -84,7 +84,7 @@ scripts/
   camara/                      calibrar_focal.py (regla), calibrar_damero.py y medir_tag.py
   historicos/                  copias de RC-0 y RC-1 (referencia, sin modificar)
   preparar_entorno.sh, ejecutar_pruebas.sh
-tests/                         una carpeta por paquete (590 pruebas)
+tests/                         una carpeta por paquete (682 pruebas)
 experimentos/                  plantillas de evidencia (vacío de mediciones reales)
 requirements-dev.txt, requirements-vision.txt
 ```
@@ -139,6 +139,13 @@ requirements-dev.txt, requirements-vision.txt
 - Scripts: `prueba_acople.py` (simulado y ensayo físico preparado), `prueba_calibracion_adaptativa.py` (circuito simulado o repetición con tramos medidos), `analizar_acople.py` (resumen y SVG).
 - **Simulado:** Monte Carlo del acople y circuitos de 8 vueltas con el robot de `simulacion/robot_simulado.py` (cifras en `acople.md`). El modo `ensayo` se probó solo contra un `rclpy` sustituto con un mundo simulado; **nunca con el robot**. 12 errores introducidos a propósito en el código (signo, reintentos, pose posterior al acople, marcha atrás, etc.) fueron detectados por las pruebas.
 - **Hallazgo:** una corrección cuesta ≈ 4–5 s; con un intercambio de 6 s casi no cabe una dentro del pit de 10 s. Detalle y límites: [`acople.md`](acople.md).
+
+### 4.5 quater ROSCar: máquina de la misión (`maquina_pit.py`, `mision.py`, `nodos/adaptador_ros.py`)
+- `MaquinaPit` implementa los diez estados (ESPERA → … → SALIENDO → NAVEGANDO, FIN y FALLA) con `paso()` a 20 Hz en un solo hilo; estados, plazos y seguridad viven dentro del mismo archivo. Reutiliza el acople (como generador), el ejecutor, el planificador y `CalibradorTramo`. `Mision` lleva estaciones, vueltas, piezas y el registro de pits (`pits.csv`).
+- Seguridad: todo `Twist` pasa por `SalidaSegura`; sin turno, con bandera roja, sin enlace o con un intercambio en curso sale cero; los estados quietos, `FIN` y `FALLA` publican ceros cada paso; un error inesperado termina en `FALLA`. No sustituye al vigilante del curso ni a la parada física.
+- `adaptador_ros.py` conecta el núcleo con ROS 2 (los nombres de tópicos del curso son provisionales).
+- **Simulado:** misión de 4 vueltas contra una planta continua y una estación que valida con la pose verdadera (`simulacion/mision_simulada.py`): 30 de 30 completas con escalas caracterizadas, 537 s de media. 21 errores introducidos a propósito en el código fueron detectados por las pruebas.
+- **Hallazgos:** el pit solo cabe en 10 s sin corrección (7.6 s; con corrección 14.8 s de media) y el 54 % de los pits simulados necesita una; con escalas sin caracterizar casi no se completa la misión. Detalle y límites: [`mision.md`](mision.md). **Nunca se ejecutó con ROS, el curso ni el robot.**
 
 ### 4.6 Configuración YAML (`docs/configuracion.md`)
 Seis archivos, cada uno con su lector validado, más un cargador estricto compartido (`comun/yaml_estricto.py`):
@@ -227,10 +234,10 @@ bash scripts/ejecutar_pruebas.sh                   # "TODO OK" si pasan
 | `tests/geometria_dock` | 6 | transformaciones 2D |
 | `tests/estacion` | 38 | estrategia, compensación, poses, configuración |
 | `tests/jetcobot_v01` | 11 | diagnóstico y cronómetro |
-| `tests/carrito` | 280 | docks, planificador, equivalencia con el HTML, ejecutor, estimadores, configuración, cámara → dock, reset, nodos con `rclpy` sustituto, acople y calibración por tramo |
+| `tests/carrito` | 372 | docks, planificador, equivalencia con el HTML, ejecutor, estimadores, configuración, cámara → dock, reset, nodos con `rclpy` sustituto, acople, calibración por tramo, máquina de la misión y su adaptador |
 | `tests/comun` | 15 | cargador YAML estricto |
 | `tests/vision` | 152 | AprilTag sintético, calibración con regla y con damero, medición con `medir_tag` (≈ 45 s; se omiten si falta OpenCV) |
-| **Total propias** | **590** | |
+| **Total propias** | **682** | |
 
 Además, las del docente: `pc-race` (126, en el entorno con `--pc-race`) y la herramienta AprilTag (24 con `-k "not tag25h9 and not tag16h5"`).
 
@@ -264,8 +271,8 @@ Preguntas para el docente que siguen abiertas (`referencia_del_reto.md` §15 las
 | 1.1 Diagnóstico del ROSCar | Herramientas listas (`diagnostico_roscar`, `preflight`, registro, análisis, procedimiento). **Pendiente:** correrlas en el robot |
 | 1.2 Planificación y ejecución | Planificador y ejecutor hechos (simulados). **Pendiente:** adaptador ROS 2, medir pausa y asentamiento |
 | 1.3 Visión y localización | Medición del tag, calibración de cámara, conversión cámara → dock y reset de pose hechos (simulados). **Pendiente:** medir el montaje de la cámara y probar con ROS real el nodo de cámara y el del TF `map → odom` (escritos, **sin probar con ROS**) |
-| 1.4 Acople y calibración adaptativa | Acople fino, calibración por tramo y estimadores `cd`/`ca` hechos (simulados; ensayo con el robot preparado, sin ejecutar). **Pendiente:** la máquina de estados del pit |
-| 1.5 Autonomía y seguridad | Condiciones de aborto del ejecutor. **Pendiente:** verificar `twist_mux` y la parada |
+| 1.4 Acople y calibración adaptativa | Acople fino, calibración por tramo y estimadores `cd`/`ca` hechos (simulados; ensayo con el robot preparado, sin ejecutar). La máquina de estados del pit está hecha y simulada (`mision.md`); **pendiente** probarla con ROS y el curso |
+| 1.5 Autonomía y seguridad | Condiciones de aborto del ejecutor y seguridad de la misión (autorización, bandera, enlace, intercambio, plazos; simulada). **Pendiente:** verificar `twist_mux`, la parada física y las interfaces reales del curso |
 | 1.6 Tablero web y registro | Sin iniciar (solo constructores de mensajes y plantillas de evidencia) |
 | 2.1 Diagnóstico del JetCobot | Scripts listos (sin brazo) |
 | 2.2 Cinemática / 2.3 Manipulación | Sin iniciar (el brazo se simula) |

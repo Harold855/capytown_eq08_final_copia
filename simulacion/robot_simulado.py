@@ -56,3 +56,26 @@ class RobotSimulado:
         if estacion is not None:
             self.estacion = estacion
         self.pose = dock_a_mapa(DOCKS_HTML[self.estacion], dx, dy, dth_deg)
+
+
+class PlantaSimulada(RobotSimulado):
+    """El mismo robot, pero con la velocidad que se le publica (`publicar`) integrada en el tiempo (`avanzar`).
+    El ruido multiplicativo se sortea una vez por cada arranque de avance o de giro."""
+
+    def __init__(self, *args, **kw) -> None:
+        super().__init__(*args, **kw)
+        self._v = self._w = 0.0
+        self._fd = self._fa = 1.0
+
+    def publicar(self, v: float, w: float) -> None:
+        if v and not self._v:
+            self._fd = 1 + self._rng.gauss(0, self._r[0])
+        if w and not self._w:
+            self._fa = 1 + self._rng.gauss(0, self._r[1])
+        self._v, self._w = v, w
+
+    def avanzar(self, dt: float) -> None:
+        th = wrap(self.pose.th + self._w * self.ca * self._fa * dt)
+        d = self._v * self.cd * self._fd * dt
+        self.pose = Pose2D(self.pose.x + d * math.cos(th), self.pose.y + d * math.sin(th), th)
+        self.t += dt

@@ -35,7 +35,7 @@ class Mensaje:
 
 class Registro:
     def __init__(self):
-        self.info, self.advertencias = [], []
+        self.info, self.advertencias, self.errores = [], [], []
 
 
 class Logger:
@@ -48,6 +48,9 @@ class Logger:
     def warning(self, t):
         self.reg.advertencias.append(t)
 
+    def error(self, t):
+        self.reg.errores.append(t)
+
 
 class Publicador:
     def __init__(self):
@@ -59,6 +62,30 @@ class Publicador:
 
     def get_subscription_count(self):
         return self.suscriptores
+
+
+class Futuro:
+    def __init__(self):
+        self.listo, self.valor = False, None
+
+    def done(self):
+        return self.listo
+
+    def result(self):
+        return self.valor
+
+
+class Cliente:
+    def __init__(self):
+        self.disponible, self.llamadas = True, []
+
+    def service_is_ready(self):
+        return self.disponible
+
+    def call_async(self, peticion):
+        f = Futuro()
+        self.llamadas.append(f)
+        return f
 
 
 class Twist:
@@ -96,6 +123,11 @@ class Node:
 
     def create_timer(self, periodo, cb):
         self.timers.append((periodo, cb))
+
+    def create_client(self, tipo, nombre):
+        c = Cliente()
+        self.clientes = getattr(self, 'clientes', []) + [(tipo, nombre, c)]
+        return c
 
     def create_publisher(self, tipo, topico, qos):
         p = Publicador()
@@ -156,9 +188,10 @@ def instalar():
     modulo('sensor_msgs')
     modulo('sensor_msgs.msg', Image=type('Image', (), {}))
     modulo('std_msgs')
-    modulo('std_msgs.msg', Int32=type('Int32', (Mensaje,), {}), String=type('String', (Mensaje,), {}))
+    modulo('std_msgs.msg', Int32=type('Int32', (Mensaje,), {}), String=type('String', (Mensaje,), {}),
+           Bool=type('Bool', (Mensaje,), {}))
     modulo('std_srvs')
-    modulo('std_srvs.srv', Trigger=type('Trigger', (), {}))
+    modulo('std_srvs.srv', Trigger=type('Trigger', (), {'Request': type('Request', (), {})}))
     modulo('tf2_ros', TransformBroadcaster=Difusor)
 
 

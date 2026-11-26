@@ -41,7 +41,7 @@ Entre máquinas solo hay MQTT, HTTP y SSH. ROS 2 vive dentro del Pi5. `twist_mux
 |---|---|---|---|
 | `control_odometria` | Equipo | `carrito/granprix_carrito/`: `planificador`, `ejecutor`, `calibracion` | Lógica **simulada**. No es un nodo ROS aún |
 | `camara_apriltag` | Equipo (base del curso) | `vision/` (medición, calibración, corrector de distorsión) | Medición (`vision/medicion.py`, `scripts/camara/medir_tag.py`), calibración y corrección de distorsión **simuladas**. El nodo `nodos/camara_apriltag_node.py` está escrito (solo probado contra un sustituto de `rclpy`) |
-| `maquina_pit` | Equipo | usa `acople.acoplar`, `CalibradorTramo`, `acople_valido`, `EstimadorEscalas`, `evaluar_reduccion` | **Pendiente** la máquina de estados (el acople y la calibración por tramo ya están, simulados) |
+| `maquina_pit` | Equipo | `maquina_pit.py` + `mision.py` (usan `acople`, `CalibradorTramo`, `EjecutorMovimiento`, `planificador`) y `nodos/adaptador_ros.py` | Máquina **simulada de punta a punta**; el nodo, solo contra un sustituto de `rclpy` (ver `mision.md`) |
 | `puente_mqtt`, `vigilante_red`, `tablero_web`, `grabador` | Curso | `integracion/` solo describe la conexión y los tópicos | Sin verificar con un broker real |
 | `placa_micro_ros` | Yahboom | `scripts/roscar_v01/` la diagnostica (solo lectura) | Sin verificar en el robot |
 
@@ -70,6 +70,11 @@ carrito.granprix_carrito
   reset_pose       -> geometria_dock                     (map -> odom)
   pose_dock        -> docks, transformacion_camara_dock, planificador, reset_pose, geometria_dock   (PoseDock, LocalizadorDock)
   gestor_reset     -> pose_dock, reset_pose, geometria_dock                     (odometría en el tiempo, tag fresco)
+  acople           -> planificador, ejecutor, configuracion, docks, pose_dock, comun, geometria_dock
+  calibracion_tramo-> acople, calibracion, planificador, pose_dock, geometria_dock
+  mision           -> configuracion, docks, comun
+  maquina_pit      -> acople, calibracion_tramo, configuracion, docks, ejecutor, mision, planificador, pose_dock, geometria_dock
+  nodos/adaptador_ros   -> maquina_pit, acople, calibracion_tramo, mision, pose_dock, transformacion_camara_dock, gestor_reset   (rclpy solo dentro de _clase_nodo)
   nodos/nodo_reset_pose -> gestor_reset, transformacion_camara_dock, pose_dock, reset_pose          (rclpy)
   nodos/tag_emulado     -> gestor_reset, transformacion_camara_dock, docks                         (rclpy solo dentro de _clase_nodo)
   nodos/camara_apriltag_node -> gestor_reset, vision.medicion                                      (rclpy solo dentro de _clase_nodo)
@@ -94,6 +99,8 @@ vision
 
 simulacion
   modelo_granprix       -> carrito.docks, carrito.planificador, geometria_dock
+  robot_simulado        -> carrito (docks, ejecutor, planificador, pose_dock), geometria_dock
+  mision_simulada       -> carrito (maquina_pit, mision, acople, calibracion_tramo…), robot_simulado
   lente                 (sin dependencias)
   apriltag_sintetico    -> vision.herramienta, lente
   damero_sintetico      -> vision.calibracion_damero, lente
@@ -120,7 +127,7 @@ pose medida al salir + pose medida al llegar (antes de acoplar)
 ```
 Lo que sigue **sin conectar**: la `Salida` real (publicador de Twist), la odometría (`odom_ok`), el reloj ROS y la medición de poses con el tag. Son los adaptadores del §7.
 
-## 6. Flujo del pit (previsto; la máquina de estados está pendiente)
+## 6. Flujo del pit (implementado en `maquina_pit.py`; ver `mision.md`)
 
 Orden del curso: medir → acoplar → solicitar → esperar resultado → medir otra vez → reset de pose y recalibración → salir (objetivo ≤ 10 s, acople ≤ 4 cm y ≤ 6°, máximo 2 reintentos).
 
@@ -129,14 +136,14 @@ Orden del curso: medir → acoplar → solicitar → esperar resultado → medir
 | medir la pose | `vision.medicion.CamaraTag.medir` y `agregar` (o `scripts/camara/medir_tag.py`), y `transformacion_camara_dock.desde_medicion` (o `pose_dock.py`) | probar `nodos/camara_apriltag_node.py` (o `tag_emulado.py` en el simulador); montaje medido; marco del dock del docente |
 | ¿está dentro de tolerancia? | `acople_valido`, `error_acople` | — |
 | corregir | `acople.acoplar` (usa `planificar_acople` + `EjecutorMovimiento`, con reintentos; ver `acople.md`) | llamarlo desde la máquina de estados; ensayar con el robot |
-| solicitud / resultado | constructores de `scripts/roscar_v01/mensajes_contrato.py`, tópicos de `mqtt.yaml` | publicarlos vía `puente_mqtt` |
-| reset de pose | `LocalizadorDock.aplicar_reset` (sobre `ResetPose`; ver `marcos_y_reset_pose.md`) | medir el montaje de la cámara; probar `nodos/nodo_reset_pose.py` con ROS real |
+| solicitud / resultado | `Puerto.solicitud` y `MaquinaPit.recibir_resultado`; el adaptador usa los constructores de `mensajes_contrato.py` | conciliar los tópicos con el `puente_mqtt` real |
+| reset de pose | `LocalizadorDock.aplicar_reset` (sobre `ResetPose`; ver `marcos_y_reset_pose.md`), pedido por el servicio de `nodo_reset_pose` | medir el montaje de la cámara; probar `nodos/nodo_reset_pose.py` con ROS real |
 | recalibrar | `calibracion_tramo.CalibradorTramo.cerrar_parada` (alimenta a `EstimadorEscalas.observar` con la pose previa al acople) | llamarlo desde la máquina de estados |
 
 El estimador necesita la pose medida **antes** de cualquier acople, y el comando **realmente enviado**: de otro modo converge a un valor sesgado.
 
 ## 7. Adaptadores pendientes (aquí se conecta lo demás)
-1. **Ejecutor → ROS 2:** una `Salida` que publique `Twist` en la entrada autorizada de `twist_mux`, un `odom_ok()` basado en `/odom`, un temporizador a 20 Hz que llame a `paso()`, y comprobar el *timeout* de `twist_mux`.
+1. **Ejecutor → ROS 2:** hecho en `nodos/adaptador_ros.py` (`Twist`, `odom_ok()` desde `/odom`, temporizador a 20 Hz), **solo contra un sustituto de `rclpy`**; falta comprobar el *timeout* de `twist_mux` y los nombres de tópicos del curso.
 2. **Cámara → ROS 2:** `carrito/nodos/camara_apriltag_node.py` (usa `CamaraTag`: corrige la distorsión, filtra por calidad y publica `/tag/pose`) está escrito pero **solo probado contra un sustituto de `rclpy`**; para el simulador RC-1, `tag_emulado.py` publica la misma medición emulada a partir de `/sim/pose`.
 3. **Pit → MQTT:** publicar `solicitud` y `evento` y leer `resultado` y `turno` con los tópicos de `mqtt.yaml`, a través de `puente_mqtt` (del curso).
 4. **Brazo:** implementar `BrazoJetCobot` según la firma que publique el docente y ajustar `puerto.py`.
@@ -151,4 +158,4 @@ El estimador necesita la pose medida **antes** de cualquier acople, y el comando
 - **Las protecciones del estimador y los placeholders del ejecutor son nuestros**, no del curso: deben revisarse con datos medidos.
 
 ## 9. Estado seguro
-Ningún script de este repositorio mueve un robot por defecto. El diagnóstico del JetCobot es de solo lectura (una prueba lo exige) y `prueba_movimiento.py` solo calcula salvo `--ejecutar --zona-segura`. El ejecutor termina siempre con ceros. Aun así, **si el proceso muere nadie envía el cero**: la protección real es el *timeout* de `twist_mux` y un medio de corte físico (ver `scripts/roscar_v01/README.md`).
+La máquina de la misión publica ceros en `FALLA`, `FIN` y todos los estados quietos, y filtra todo `Twist` por `SalidaSegura` (ver `mision.md`). Ningún script de este repositorio mueve un robot por defecto. El diagnóstico del JetCobot es de solo lectura (una prueba lo exige) y `prueba_movimiento.py` solo calcula salvo `--ejecutar --zona-segura`. El ejecutor termina siempre con ceros. Aun así, **si el proceso muere nadie envía el cero**: la protección real es el *timeout* de `twist_mux` y un medio de corte físico (ver `scripts/roscar_v01/README.md`).

@@ -94,26 +94,27 @@ Bono: +1 por odometría visual documentada (sin pasar de 20). Rige la rúbrica d
 | Nodo ROS 2 del reset de pose (TF `map → odom`) | Escrito; **probado solo contra un sustituto de `rclpy`** |
 | Nodo de cámara (`camara_apriltag_node.py`) y emulador del tag para el simulador RC-1 (`tag_emulado.py`) | Escritos; **probados solo contra un sustituto de `rclpy`** |
 | Acople fino (`acople.py`) y calibración por tramo (`calibracion_tramo.py`) | Hechos en Python puro; simulados (el ensayo con el robot está preparado, sin ejecutar) |
-| Máquina de estados del pit y tablero web | **Pendientes** |
+| Máquina de la misión (`maquina_pit.py`, `mision.py`) y su nodo ROS 2 (`adaptador_ros.py`) | Hechas; simuladas de punta a punta (4 vueltas); el nodo **probado solo contra un sustituto de `rclpy`** |
+| Tablero web | **Pendiente** |
 | Pruebas con los robots reales | **Ninguna todavía** |
 
 ## Cómo empezar
 
 ```bash
 bash scripts/preparar_entorno.sh --vision   # entorno virtual y dependencias
-bash scripts/ejecutar_pruebas.sh            # 590 pruebas; "TODO OK" si pasan
+bash scripts/ejecutar_pruebas.sh            # 682 pruebas; "TODO OK" si pasan
 ```
 
 Detalle del entorno en [`docs/entorno_desarrollo.md`](docs/entorno_desarrollo.md).
 
 ## Organización del repositorio
 
-- `carrito/`: lógica del ROSCar (docks, planificador, ejecutor, estimadores, acople, configuración) y `nodos/` con el nodo ROS 2 del reset de pose; el resto aún no son nodos.
+- `carrito/`: lógica del ROSCar (docks, planificador, ejecutor, estimadores, acople, máquina de la misión, configuración) y `nodos/` con el nodo ROS 2 del reset de pose; el resto aún no son nodos.
 - `estacion/`: estrategia de cambio de pieza (`app_equipo`) con brazo simulado. El supervisor es del curso.
 - `vision/`: medición del AprilTag y calibración de la cámara. `integracion/`: configuración MQTT. `comun/`, `geometria_dock/`: utilidades compartidas.
 - `simulacion/`: modelo del simulador del HTML, barridos de parámetros e imágenes sintéticas.
 - `scripts/`: entorno, pruebas, diagnósticos (ROSCar, JetCobot), calibración de cámara y copias históricas de RC-0 y RC-1.
-- `tests/`: 590 pruebas propias. `experimentos/`: pruebas de laboratorio, separadas de la evidencia oficial.
+- `tests/`: 682 pruebas propias. `experimentos/`: pruebas de laboratorio, separadas de la evidencia oficial.
 - `vendor/granprix/`: copia fija del repositorio del docente, **sin modificar**.
 - `docs/`: documentación; el índice está en [`docs/README.md`](docs/README.md).
 

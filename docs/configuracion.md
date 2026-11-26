@@ -1,10 +1,11 @@
 # Configuraciones YAML
 
-Siete archivos de configuración, todos con el mismo cargador estricto (`comun/yaml_estricto.py`). Cada clave que aparece en un YAML está leída y validada por código: **una clave que ninguna función lee no existe**, para que nadie edite algo creyendo que cambia el comportamiento.
+Ocho archivos de configuración, todos con el mismo cargador estricto (`comun/yaml_estricto.py`). Cada clave que aparece en un YAML está leída y validada por código: **una clave que ninguna función lee no existe**, para que nadie edite algo creyendo que cambia el comportamiento.
 
 | Archivo | Lo lee | Qué fija | Estado de los valores |
 |---|---|---|---|
 | `carrito/config/movimiento.yaml` | `carrito.granprix_carrito.configuracion.cargar_movimiento` | velocidades de referencia y límites, parámetros del ejecutor | límites = reto; referencias = HTML/RC-1; `pausa_s` y `asentamiento_s` = **placeholders a medir** |
+| `carrito/config/mision.yaml` | `carrito.granprix_carrito.mision.cargar_mision` | equipo, vueltas, cadena de piezas, plazos por estado, seguridad | tanda 720 s y pit 10 s = reto (el cargador rechaza más); la cadena de piezas debe cerrar; el resto es **propio y provisional** |
 | `carrito/config/acople.yaml` | `carrito.granprix_carrito.acople.cargar_acople` | tolerancias internas, ganancias, velocidades del acople, reintentos, alcance, marcha atrás, presupuesto de tiempo | límites = reto (el cargador rechaza más); `v` y `w` deben coincidir con `movimiento.yaml`; el resto es **propio y provisional** |
 | `carrito/config/marcos.yaml` | `carrito.granprix_carrito.transformacion_camara_dock.cargar_marcos` | montaje de la cámara en el robot, posición del tag en el dock, umbrales de "cerca del dock" | **`null`: se miden en el laboratorio**; la carga falla hasta entonces |
 | `carrito/config/calibracion.yaml` | `EstimadorEscalas.cargar` / `cargar_carrito` | robot, escalas `cd`/`ca` iniciales, perfil `v`/`ω`, parámetros del estimador | escalas **1.0 = sin caracterizar**; `alpha` 0.35 = referencia del HTML |

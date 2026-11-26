@@ -22,7 +22,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, List, Optional, Protocol
+from typing import Callable, Iterator, List, Optional, Protocol
 
 from .planificador import V_MAX, W_MAX, Comando
 
@@ -103,6 +103,10 @@ class EjecutorMovimiento:
     @property
     def terminado(self) -> bool:
         return self._estado in FINALES
+
+    @property
+    def ceros_pendientes(self) -> int:
+        return self._ceros_pendientes
 
     def iniciar(self, cmd: Comando) -> None:
         if self._estado not in (Estado.ESPERA,) + FINALES:
@@ -228,16 +232,22 @@ class EjecutorMovimiento:
         self._parar_por(estado, motivo, self._reloj())
 
 
-def ejecutar_hasta_el_final(ej: EjecutorMovimiento, dormir: Callable[[float], None], periodo_s: float = 0.05,
-                            max_pasos: int = 100000) -> Resultado:
-    """Ayudante bloqueante para scripts y pruebas: llama a paso() cada `periodo_s` hasta terminar."""
+def pasos_hasta_el_final(ej: EjecutorMovimiento, max_pasos: int = 100000) -> Iterator[None]:
+    """Llama a paso() hasta terminar y publica los ceros finales; cada `yield` pide esperar un periodo."""
     for _ in range(max_pasos):
         if ej.paso() in FINALES:
             break
-        dormir(periodo_s)
+        yield
     else:
         ej.abortar('MAX_PASOS')
-    while ej._ceros_pendientes > 0:  # asegura los ceros finales tras abortar
+    while ej.ceros_pendientes > 0:
         ej.paso()
+        yield
+
+
+def ejecutar_hasta_el_final(ej: EjecutorMovimiento, dormir: Callable[[float], None], periodo_s: float = 0.05,
+                            max_pasos: int = 100000) -> Resultado:
+    """Ayudante bloqueante para scripts y pruebas: llama a paso() cada `periodo_s` hasta terminar."""
+    for _ in pasos_hasta_el_final(ej, max_pasos):
         dormir(periodo_s)
     return ej.resultado()

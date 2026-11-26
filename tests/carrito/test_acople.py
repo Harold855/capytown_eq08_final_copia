@@ -422,5 +422,114 @@ class TestMedidorTag(unittest.TestCase):
                 MedidorTag(lambda: 0.0, lambda s: None, **kw)
 
 
+class TestGeneradores(unittest.TestCase):
+    """`acoplar_pasos` es lo que avanza la máquina del pit un paso por tick: mismo resultado que el bloqueante, sin esperar."""
+
+    def en_pasos(self, r, **kw):
+        n = {'yields': 0, 'medir': 0, 'mover': 0}
+
+        def medir():
+            n['medir'] += 1
+            yield
+            return r.medir()
+
+        def mover(cmd):
+            n['mover'] += 1
+            yield
+            return r.mover(cmd)
+        gen = ac.acoplar_pasos(medir, mover, CFG, Escalas(), r.reloj, **kw)
+        try:
+            while True:
+                next(gen)
+                n['yields'] += 1
+        except StopIteration as fin:
+            return fin.value, n
+
+    def test_mismo_resultado_que_la_version_bloqueante(self):
+        for i in range(10):
+            a, b = robot(-0.08, 0.03, 9.0, cd=1.01, ca=1.09, ruido_d=0.01, ruido_a=0.01, ruido_tag_m=0.002, semilla=i), \
+                robot(-0.08, 0.03, 9.0, cd=1.01, ca=1.09, ruido_d=0.01, ruido_a=0.01, ruido_tag_m=0.002, semilla=i)
+            bloq = acoplar(a.medir, a.mover, CFG, Escalas(), a.reloj)
+            gen, n = self.en_pasos(b)
+            self.assertEqual((gen.exito, gen.motivo, gen.correcciones), (bloq.exito, bloq.motivo, bloq.correcciones))
+            self.assertEqual(gen.pose_final, bloq.pose_final)
+            self.assertEqual(n['yields'], n['medir'] + n['mover'])        # cada espera cede el control
+
+    def test_con_pose_inicial_no_repite_la_primera_medicion(self):
+        r = robot(0.01, 0.0, 1.0)
+        res, n = self.en_pasos(r, pose_inicial=r.medir())
+        self.assertTrue(res.exito)
+        self.assertEqual(n['medir'], 0)
+
+    def test_correr_devuelve_el_valor_y_duerme_entre_pasos(self):
+        dormidas = []
+
+        def g():
+            yield
+            yield
+            return 7
+        self.assertEqual(ac.correr(g(), dormidas.append, 0.05), 7)
+        self.assertEqual(dormidas, [0.05, 0.05])
+
+    def test_cancelar_a_mitad_del_movimiento_publica_cero(self):
+        reloj = Reloj()
+        planta = Planta(reloj, dock_a_mapa(D[1], -0.2, 0, 0), 1.0, 1.0)
+        mover = ac.mover_con_ejecutor(planta, reloj, None, Config(), CFG)
+        gen = mover(planificar_correccion(pose(-0.2, 0, 0), Escalas(), CFG)[0])
+        for _ in range(10):
+            next(gen)
+            reloj.dormir(0.05)
+        self.assertGreater(planta.publicado[-1][1], 0.0)             # avanzando
+        gen.close()
+        self.assertEqual(planta.publicado[-1][1:], (0.0, 0.0))
+
+    def test_un_comando_rechazado_no_publica_nada(self):
+        reloj = Reloj()
+        planta = Planta(reloj, dock_a_mapa(D[1], -0.2, 0, 0), 1.0, 1.0)
+        mover = ac.mover_con_ejecutor(planta, reloj, None, Config(), CFG)
+        malo = dataclasses.replace(planificar_correccion(pose(-0.2, 0, 0), Escalas(), CFG)[0], v=0.5)
+        with self.assertRaises(ValueError):
+            next(mover(malo))
+        self.assertEqual(planta.publicado, [])
+
+
+class TestMedidorSinEspera(unittest.TestCase):
+    def test_intentar_no_bloquea_y_exige_lecturas_posteriores_al_reposo(self):
+        t = [0.0]
+        m = MedidorTag(lambda: t[0], lambda s: None, lecturas=2, espera_s=0.5)
+        m.agregar(pose(0.01, 0, 0))
+        m.en_reposo()
+        self.assertIsNone(m.intentar())
+        t[0] = 0.6
+        m.agregar(pose(0.02, 0, 0))
+        self.assertIsNone(m.intentar())          # solo una lectura nueva
+        m.agregar(pose(0.04, 0, 0))
+        self.assertAlmostEqual(m.intentar().dx, 0.03, places=9)
+
+    def test_en_reposo_con_espera_cero_acepta_lecturas_desde_ahora(self):
+        t = [5.0]
+        m = MedidorTag(lambda: t[0], lambda s: None, lecturas=1, espera_s=0.8)
+        m.agregar(pose(0.5, 0, 0))
+        t[0] = 6.0
+        m.en_reposo(0.0)
+        self.assertIsNone(m.intentar())          # la lectura vieja no vale
+        m.agregar(pose(0.02, 0, 0))
+        self.assertAlmostEqual(m.intentar().dx, 0.02)
+
+    def test_esperar_cede_el_control_y_vence_por_tiempo(self):
+        t = [0.0]
+        m = MedidorTag(lambda: t[0], lambda s: None, lecturas=1, espera_s=0.0, timeout_s=1.0)
+        m.en_reposo()
+        g, cedidas = m.esperar(), 0
+        try:
+            while True:
+                next(g)
+                cedidas += 1
+                t[0] += 0.1
+        except StopIteration as fin:
+            self.assertIsNone(fin.value)
+        self.assertGreaterEqual(cedidas, 9)
+
+
 if __name__ == '__main__':
     unittest.main()

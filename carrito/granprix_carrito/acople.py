@@ -4,17 +4,21 @@ Reutiliza `planificar_acople` (geometría), `comandar` (compensa con cd y ca), `
 (publica) y `acople_valido` (4 cm y 6°). Aquí solo se añade el ciclo, la ganancia y las salvaguardas.
 La medición y el movimiento entran como funciones, así que no usa ROS. Los umbrales propios son provisionales.
 
+El ciclo es un generador (`acoplar_pasos`): cada `yield` pide esperar un periodo. `acoplar` lo corre de forma bloqueante y la
+máquina del pit lo avanza un paso por tick sin hilos. `medir` y `mover` pueden ser funciones normales o generadores.
+
 Las correcciones del acople NO alimentan al estimador de escalas (ver calibracion_tramo.py).
 """
 from __future__ import annotations
 
 import dataclasses
+import inspect
 import math
 import os
 import statistics
 import time
 from dataclasses import dataclass
-from typing import Callable, Deque, List, Optional, Tuple
+from typing import Any, Callable, Deque, Generator, List, Optional, Tuple
 from collections import deque
 
 from comun import yaml_estricto as ye
@@ -22,7 +26,7 @@ from geometria_dock.transformaciones import Pose2D, wrap
 
 from .configuracion import ConfigMovimiento, DIRECTORIO_DEFECTO
 from .docks import DOCKS_HTML, dock_a_mapa
-from .ejecutor import Config, Estado, EjecutorMovimiento, Resultado, Salida, ejecutar_hasta_el_final
+from .ejecutor import Config, Estado, EjecutorMovimiento, Resultado, Salida, pasos_hasta_el_final
 from .planificador import (TOL_ANG_DEG, TOL_POS_M, V_MAX, W_MAX, Comando, Escalas, Primitiva, Tramo, comandar,
                            error_acople, planificar_acople)
 from .pose_dock import PoseDock
@@ -139,9 +143,29 @@ def planificar_correccion(p: PoseDock, escalas: Escalas, cfg: ConfigAcople) -> L
 
 
 # ------------------------------------------------------------------ ciclo
-def _leer(medir: Medir, intentos: int) -> Optional[PoseDock]:
+Pasos = Generator[None, None, Any]
+
+
+def _llamar(f: Callable, *args: Any) -> Pasos:
+    r = f(*args)
+    if inspect.isgenerator(r):
+        r = yield from r
+    return r
+
+
+def correr(gen: Pasos, dormir: Callable[[float], None], periodo_s: float = 0.02) -> Any:
+    """Corre un generador de pasos de forma bloqueante y devuelve su valor final."""
+    try:
+        while True:
+            next(gen)
+            dormir(periodo_s)
+    except StopIteration as fin:
+        return fin.value
+
+
+def _leer(medir: Medir, intentos: int) -> Pasos:
     for _ in range(intentos):
-        p = medir()
+        p = yield from _llamar(medir)
         if p is not None:
             return p
     return None
@@ -161,11 +185,11 @@ def _bloqueo(pose: PoseDock, n: int, cfg: ConfigAcople, transcurrido: float, par
     return None
 
 
-def _ejecutar(cmds: List[Comando], mover: Mover) -> Tuple[List[Comando], Optional[str]]:
+def _ejecutar(cmds: List[Comando], mover: Mover) -> Generator[None, None, Tuple[List[Comando], Optional[str]]]:
     efectivos: List[Comando] = []
     for c in cmds:
         try:
-            efectivo, res = mover(c)
+            efectivo, res = yield from _llamar(mover, c)
         except ValueError:
             return efectivos, 'COMANDO_INVALIDO'
         efectivos.append(efectivo)
@@ -174,14 +198,15 @@ def _ejecutar(cmds: List[Comando], mover: Mover) -> Tuple[List[Comando], Optiona
     return efectivos, None
 
 
-def acoplar(medir: Medir, mover: Mover, cfg: ConfigAcople = ConfigAcople(), escalas: Escalas = Escalas(),
-            reloj: Callable[[], float] = time.monotonic, debe_parar: Optional[Callable[[], bool]] = None
-            ) -> ResultadoAcople:
+def acoplar_pasos(medir: Medir, mover: Mover, cfg: ConfigAcople = ConfigAcople(), escalas: Escalas = Escalas(),
+                  reloj: Callable[[], float] = time.monotonic, debe_parar: Optional[Callable[[], bool]] = None,
+                  pose_inicial: Optional[PoseDock] = None) -> Generator[None, None, ResultadoAcople]:
     """Corrige hasta quedar dentro de la tolerancia interna, con `1 + reintentos` correcciones como máximo.
     `medir` devuelve la pose en el dock con el robot ya quieto (None si no hay tag); `mover` ejecuta un Comando y
-    devuelve (comando efectivo, Resultado del ejecutor). Tras un movimiento fallido no se afirma ninguna pose final."""
+    devuelve (comando efectivo, Resultado del ejecutor). `pose_inicial` evita repetir la primera medición.
+    Tras un movimiento fallido no se afirma ninguna pose final."""
     t0 = reloj()
-    pose = inicial = _leer(medir, cfg.lecturas_max)
+    pose = inicial = pose_inicial if pose_inicial is not None else (yield from _leer(medir, cfg.lecturas_max))
     intentos: List[Intento] = []
     motivo: Optional[str] = None
     perdido = False
@@ -199,9 +224,9 @@ def acoplar(medir: Medir, mover: Mover, cfg: ConfigAcople = ConfigAcople(), esca
         except _Rechazo as e:
             motivo = e.motivo
             break
-        efectivos, motivo = _ejecutar(cmds, mover)
+        efectivos, motivo = yield from _ejecutar(cmds, mover)
         perdido = motivo is not None
-        nueva = None if perdido else _leer(medir, cfg.lecturas_max)
+        nueva = None if perdido else (yield from _leer(medir, cfg.lecturas_max))
         intentos.append(Intento(len(intentos) + 1, pose, tuple(cmds), tuple(efectivos), nueva))
         if perdido:
             break
@@ -211,6 +236,13 @@ def acoplar(medir: Medir, mover: Mover, cfg: ConfigAcople = ConfigAcople(), esca
     if exito and motivo in ('REINTENTOS_AGOTADOS', 'SIN_TIEMPO'):
         motivo = 'EN_BORDE'
     return ResultadoAcople(exito, motivo, tuple(intentos), inicial, final, reloj() - t0)
+
+
+def acoplar(medir: Medir, mover: Mover, cfg: ConfigAcople = ConfigAcople(), escalas: Escalas = Escalas(),
+            reloj: Callable[[], float] = time.monotonic, debe_parar: Optional[Callable[[], bool]] = None,
+            pose_inicial: Optional[PoseDock] = None, dormir: Callable[[float], None] = time.sleep) -> ResultadoAcople:
+    """Versión bloqueante de `acoplar_pasos` (scripts y pruebas). Con funciones normales nunca duerme."""
+    return correr(acoplar_pasos(medir, mover, cfg, escalas, reloj, debe_parar, pose_inicial), dormir)
 
 
 # ------------------------------------------------------------------ medición y movimiento reales
@@ -229,18 +261,25 @@ class MedidorTag:
     def agregar(self, pose: PoseDock) -> None:
         self._lect.append((self._reloj(), pose))
 
-    def en_reposo(self) -> None:
-        self._desde = self._reloj() + self._espera
+    def en_reposo(self, espera_s: Optional[float] = None) -> None:
+        """Solo valen las lecturas posteriores a ahora + `espera_s` (por defecto la del medidor; 0 si el robot no se movió)."""
+        self._desde = self._reloj() + (self._espera if espera_s is None else espera_s)
 
-    def medir(self) -> Optional[PoseDock]:
+    def intentar(self) -> Optional[PoseDock]:
+        """Sin esperar: la pose estable si ya llegaron `lecturas` mediciones posteriores al reposo, o None."""
+        nuevas = [p for t, p in self._lect if t >= self._desde]
+        return self._mediana(nuevas[-self._n:]) if len(nuevas) >= self._n else None
+
+    def esperar(self) -> Pasos:
         fin = self._reloj() + self._timeout + max(0.0, self._desde - self._reloj())
         while True:
-            nuevas = [p for t, p in self._lect if t >= self._desde]
-            if len(nuevas) >= self._n:
-                return self._mediana(nuevas[-self._n:])
-            if self._reloj() >= fin:
-                return None
-            self._dormir(0.02)
+            p = self.intentar()
+            if p is not None or self._reloj() >= fin:
+                return p
+            yield
+
+    def medir(self) -> Optional[PoseDock]:
+        return correr(self.esperar(), self._dormir)
 
     @staticmethod
     def _mediana(poses: List[PoseDock]) -> PoseDock:
@@ -250,21 +289,26 @@ class MedidorTag:
                                    mapa=dock_a_mapa(DOCKS_HTML[u.estacion], dx, dy, math.degrees(dth)))
 
 
-def mover_con_ejecutor(salida: Salida, reloj: Callable[[], float], dormir: Callable[[float], None],
+def mover_con_ejecutor(salida: Salida, reloj: Callable[[], float], dormir: Optional[Callable[[float], None]],
                        config: Config = Config(), cfg: ConfigAcople = ConfigAcople(),
                        odom_ok: Optional[Callable[[], bool]] = None, debe_parar: Optional[Callable[[], bool]] = None,
                        al_parar: Optional[Callable[[], None]] = None) -> Mover:
-    """Un `Mover` que ejecuta cada Comando con el ejecutor existente. `al_parar` se llama al terminar (p. ej. `MedidorTag.en_reposo`)."""
+    """Un `Mover` que ejecuta cada Comando con el ejecutor existente. `al_parar` se llama al terminar (p. ej. `MedidorTag.en_reposo`).
+    Con `dormir=None` devuelve un generador de pasos (para la máquina del pit); si se cancela, publica ceros."""
     config = dataclasses.replace(config, permitir_reversa=cfg.reversa_max_m > 0)
 
-    def mover(cmd: Comando) -> Tuple[Comando, Resultado]:
+    def pasos(cmd: Comando) -> Generator[None, None, Tuple[Comando, Resultado]]:
         ej = EjecutorMovimiento(salida, reloj, config, odom_ok, debe_parar)
-        ej.iniciar(cmd)
-        res = ejecutar_hasta_el_final(ej, dormir, config.periodo_s)
+        try:
+            ej.iniciar(cmd)
+            yield from pasos_hasta_el_final(ej)
+        finally:
+            if ej.estado is not Estado.ESPERA:
+                ej.abortar('CANCELADO')   # no hace nada si ya terminó; si se cancela a medias, frena
         if al_parar is not None:
             al_parar()
-        return ej.comando_efectivo(cmd), res
-    return mover
+        return ej.comando_efectivo(cmd), ej.resultado()
+    return pasos if dormir is None else (lambda cmd: correr(pasos(cmd), dormir, config.periodo_s))
 
 
 # ------------------------------------------------------------------ configuración

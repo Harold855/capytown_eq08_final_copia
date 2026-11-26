@@ -7,7 +7,9 @@ carrito/granprix_carrito/
   docks.py          docks del circuito (nominales del HTML; cargables desde JSON), conversión mapa <-> dock
   planificador.py   tramos, comando compensado, estimador de escalas, vuelta, presupuesto y acople
   acople.py         ciclo medir -> corregir -> medir con control proporcional (usa planificar_acople y el ejecutor)
+  maquina_pit.py    máquina de estados de la misión (estados, plazos y seguridad dentro) y mision.py (estaciones, vueltas, piezas)
   calibracion_tramo.py  coordina las mediciones de cada parada con el estimador de escalas y guarda errores antes/después
+  config/mision.yaml    equipo, vueltas, piezas, plazos y seguridad de la misión
   config/acople.yaml    tolerancias, ganancias, velocidades, reintentos y alcance del acople
 simulacion/modelo_granprix.py   port a Python del simulate() del HTML, usando este planificador
 ```
@@ -117,6 +119,9 @@ res = acoplar(medidor.medir, mover_con_ejecutor(salida, reloj, dormir, mov.ejecu
               cfg, est.escalas)
 parada = calibrador.cerrar_parada(estacion, res, post=pose_tras_el_intercambio, vuelta=1)
 ```
+
+## Máquina de la misión (`maquina_pit.py`, `mision.py`)
+`MaquinaPit.paso()` (20 Hz, un hilo) recorre ESPERA → [MIDIENDO → ACOPLANDO → SOLICITANDO → ESPERANDO_RESULTADO → RECALIBRANDO → SALIENDO → NAVEGANDO] × 16 → FIN, o FALLA. Toda velocidad pasa por `SalidaSegura`; lo externo entra por `recibir_*` y las salidas hacia el curso por un `Puerto`. `nodos/adaptador_ros.py` la conecta con ROS 2. Estados, seguridad, interfaz y cifras de simulación: [`docs/mision.md`](../docs/mision.md). `python3 simulacion/mision_simulada.py` corre una misión completa simulada.
 
 ## Verificación
 - **Equivalencia con el HTML oficial:** `simulacion/modelo_granprix.py` usa este planificador y reproduce el `simulate()` original (mismas semillas) en 18 casos y 288 llegadas, con una tolerancia de 1e-9 (`tests/carrito/test_equivalencia_html.py`). La referencia son salidas del JavaScript original ejecutado con Node.js (`tests/carrito/referencia_html.json`).

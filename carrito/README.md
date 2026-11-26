@@ -4,14 +4,22 @@ Primer módulo real del carrito: el **planificador matemático** (sección 1.2 d
 
 ```
 carrito/granprix_carrito/
-  docks.py          docks del circuito (nominales del HTML; cargables desde JSON), conversión mapa <-> dock
-  planificador.py   tramos, comando compensado, estimador de escalas, vuelta, presupuesto y acople
-  acople.py         ciclo medir -> corregir -> medir con control proporcional (usa planificar_acople y el ejecutor)
-  maquina_pit.py    máquina de estados de la misión (estados, plazos y seguridad dentro) y mision.py (estaciones, vueltas, piezas)
-  calibracion_tramo.py  coordina las mediciones de cada parada con el estimador de escalas y guarda errores antes/después
-  config/mision.yaml    equipo, vueltas, piezas, plazos y seguridad de la misión
-  config/acople.yaml    tolerancias, ganancias, velocidades, reintentos y alcance del acople
-simulacion/modelo_granprix.py   port a Python del simulate() del HTML, usando este planificador
+├── docks.py, configuracion.py              estaciones y coordenadas; carga de parámetros
+├── planificador.py, ejecutor.py            cálculo y ejecución del movimiento
+├── calibracion.py, calibracion_tramo.py    estimación de cd y ca; coordina sus mediciones por tramo
+├── reset_pose.py, gestor_reset.py, pose_dock.py, transformacion_camara_dock.py
+│                                           pose del robot en el dock y corrección de la localización
+├── acople.py                               corrección visual
+├── maquina_pit.py, mision.py               control de cada parada y de las cuatro vueltas
+├── eventos_mision.py, cronometro.py        eventos y tiempos de nuestra lógica
+├── adaptador_ros.py                        conexión con ROS 2 (rclpy solo dentro de _clase_nodo)
+├── registro_experimental.py                evidencias de las pruebas de laboratorio
+└── tablero_extension/metricas.py           indicadores para el tablero
+carrito/nodos/                              nodo_reset_pose, camara_apriltag_node, tag_emulado (rclpy)
+carrito/config/                             movimiento, calibracion, marcos, marcos_sim, acople, mision (.yaml)
+evidencia/                                  verificar_evidencias.py, evidencia.yaml, archivos_falsos.py
+tablero/                                    panel.html/js/css y datos_simulados.py (prototipo)
+simulacion/                                 modelo_granprix, robot_simulado, mision_simulada...
 ```
 
 ## Qué hace
@@ -121,10 +129,10 @@ parada = calibrador.cerrar_parada(estacion, res, post=pose_tras_el_intercambio, 
 ```
 
 ## Máquina de la misión (`maquina_pit.py`, `mision.py`)
-`MaquinaPit.paso()` (20 Hz, un hilo) recorre ESPERA → [MIDIENDO → ACOPLANDO → SOLICITANDO → ESPERANDO_RESULTADO → RECALIBRANDO → SALIENDO → NAVEGANDO] × 16 → FIN, o FALLA. Toda velocidad pasa por `SalidaSegura`; lo externo entra por `recibir_*` y las salidas hacia el curso por un `Puerto`. `nodos/adaptador_ros.py` la conecta con ROS 2. Estados, seguridad, interfaz y cifras de simulación: [`docs/mision.md`](../docs/mision.md). `python3 simulacion/mision_simulada.py` corre una misión completa simulada.
+`MaquinaPit.paso()` (20 Hz, un hilo) recorre ESPERA → [MIDIENDO → ACOPLANDO → SOLICITANDO → ESPERANDO_RESULTADO → RECALIBRANDO → SALIENDO → NAVEGANDO] × 16 → FIN, o FALLA. Toda velocidad pasa por `SalidaSegura`; lo externo entra por `recibir_*` y las salidas hacia el curso por un `Puerto`. `adaptador_ros.py` la conecta con ROS 2. Estados, seguridad, interfaz y cifras de simulación: [`docs/mision.md`](../docs/mision.md). `python3 simulacion/mision_simulada.py` corre una misión completa simulada.
 
 ## Eventos, cronómetro y métricas
-`MaquinaPit` registra sus eventos (`eventos_mision.py`, JSONL); `cronometro.py` y `metricas.py` calculan vueltas, sectores, pits y precisión desde ellos. Detalle, verificador de evidencia y panel: [`docs/tablero_y_evidencia.md`](../docs/tablero_y_evidencia.md).
+`MaquinaPit` registra sus eventos (`eventos_mision.py`, JSONL); `cronometro.py` y `tablero_extension/metricas.py` calculan vueltas, sectores, pits y precisión desde ellos. Detalle, verificador de evidencia y panel: [`docs/tablero_y_evidencia.md`](../docs/tablero_y_evidencia.md).
 
 ## Verificación
 - **Equivalencia con el HTML oficial:** `simulacion/modelo_granprix.py` usa este planificador y reproduce el `simulate()` original (mismas semillas) en 18 casos y 288 llegadas, con una tolerancia de 1e-9 (`tests/carrito/test_equivalencia_html.py`). La referencia son salidas del JavaScript original ejecutado con Node.js (`tests/carrito/referencia_html.json`).

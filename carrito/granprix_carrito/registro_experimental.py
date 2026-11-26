@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Registro de las pruebas de laboratorio: una línea JSON por prueba, solo se añade, y cada línea lleva el hash de la anterior.
 
-    python3 evidencia/registro_experimental.py agregar --tipo recta --robot eq08-roscar --operador ana --estado ok \\
+    python3 -m carrito.granprix_carrito.registro_experimental agregar --tipo recta --robot eq08-roscar --operador ana --estado ok \\
         --parametro distancia_m=0.5 --resultado distancia_fisica_m=0.49 --archivo experimentos/dia01_roscar/movimientos_odom.csv
-    python3 evidencia/registro_experimental.py listar | verificar | exportar --salida registro.csv
+    python3 -m carrito.granprix_carrito.registro_experimental listar | verificar | exportar --salida registro.csv
 
 Las pruebas fallidas se registran igual (`--estado fallo`); una corrección es un registro nuevo con `--corrige ID`, nunca una
 edición. Los archivos adjuntos guardan su SHA-256: si cambian después, `verificar` lo dice. La cadena de hashes detecta que se

@@ -68,8 +68,11 @@ docs/                          documentación (índice en docs/README.md)
 vendor/granprix/               copia fija del repositorio del docente (NO se edita)
 carrito/                       lógica del ROSCar en Python puro
   nodos/                       nodo_reset_pose.py, tag_emulado.py, camara_apriltag_node.py (rclpy; sin verificar con ROS)
-  granprix_carrito/            docks, planificador, ejecutor, calibracion, acople, calibracion_tramo, configuracion
-  config/                      movimiento.yaml, calibracion.yaml, acople.yaml
+  granprix_carrito/            docks, planificador, ejecutor, calibracion, acople, maquina_pit, mision, adaptador_ros, registro_experimental,
+                               tablero_extension/metricas... (árbol completo en carrito/README.md)
+  config/                      movimiento, calibracion, marcos, marcos_sim, acople, mision (.yaml)
+evidencia/                     verificar_evidencias.py, evidencia.yaml, archivos_falsos.py
+tablero/                       panel.html/js/css y datos_simulados.py
 estacion/                      estrategia de cambio de pieza del JetCobot
   src/app_equipo/              puerto, roles, compensacion_pose, posiciones, estrategia, brazo_simulado, configuracion
   config/                      estacion.yaml, poses.plantilla.yaml
@@ -140,14 +143,14 @@ requirements-dev.txt, requirements-vision.txt
 - **Simulado:** Monte Carlo del acople y circuitos de 8 vueltas con el robot de `simulacion/robot_simulado.py` (cifras en `acople.md`). El modo `ensayo` se probó solo contra un `rclpy` sustituto con un mundo simulado; **nunca con el robot**. 12 errores introducidos a propósito en el código (signo, reintentos, pose posterior al acople, marcha atrás, etc.) fueron detectados por las pruebas.
 - **Hallazgo:** una corrección cuesta ≈ 4–5 s; con un intercambio de 6 s casi no cabe una dentro del pit de 10 s. Detalle y límites: [`acople.md`](acople.md).
 
-### 4.5 quater ROSCar: máquina de la misión (`maquina_pit.py`, `mision.py`, `nodos/adaptador_ros.py`)
+### 4.5 quater ROSCar: máquina de la misión (`maquina_pit.py`, `mision.py`, `adaptador_ros.py`)
 - `MaquinaPit` implementa los diez estados (ESPERA → … → SALIENDO → NAVEGANDO, FIN y FALLA) con `paso()` a 20 Hz en un solo hilo; estados, plazos y seguridad viven dentro del mismo archivo. Reutiliza el acople (como generador), el ejecutor, el planificador y `CalibradorTramo`. `Mision` lleva estaciones, vueltas, piezas y el registro de pits (`pits.csv`).
 - Seguridad: todo `Twist` pasa por `SalidaSegura`; sin turno, con bandera roja, sin enlace o con un intercambio en curso sale cero; los estados quietos, `FIN` y `FALLA` publican ceros cada paso; un error inesperado termina en `FALLA`. No sustituye al vigilante del curso ni a la parada física.
 - `adaptador_ros.py` conecta el núcleo con ROS 2 (los nombres de tópicos del curso son provisionales).
 - **Simulado:** misión de 4 vueltas contra una planta continua y una estación que valida con la pose verdadera (`simulacion/mision_simulada.py`): 30 de 30 completas con escalas caracterizadas, 537 s de media. 21 errores introducidos a propósito en el código fueron detectados por las pruebas.
 - **Hallazgos:** el pit solo cabe en 10 s sin corrección (7.6 s; con corrección 14.8 s de media) y el 54 % de los pits simulados necesita una; con escalas sin caracterizar casi no se completa la misión. Detalle y límites: [`mision.md`](mision.md). **Nunca se ejecutó con ROS, el curso ni el robot.**
 
-### 4.5 quinquies Evidencia, métricas y panel (`eventos_mision.py`, `cronometro.py`, `metricas.py`, `evidencia/`, `tablero/`)
+### 4.5 quinquies Evidencia, métricas y panel (`eventos_mision.py`, `cronometro.py`, `tablero_extension/metricas.py`, `registro_experimental.py`, `evidencia/`, `tablero/`)
 - La máquina registra sus eventos en JSONL; de ahí salen el cronómetro (vueltas, sectores, tramos, pits) y las métricas; el panel (prototipo estático) las muestra.
 - `verificar_evidencias.py` comprueba video (por cajas MP4), rosbag2 (cuenta cada mensaje en el SQLite: evita los bags vacíos de RC-1) y CSV, y la cobertura temporal con `eventos.jsonl`. `registro_experimental.py` guarda las pruebas de laboratorio con cadena de hashes.
 - **Verificado:** 22 errores introducidos a propósito en verificador y registro, todos detectados; el bug de un argumento duplicado en un evento lo atrapó la prueba de seguridad (la máquina cayó en `FALLA`, no siguió a ciegas).

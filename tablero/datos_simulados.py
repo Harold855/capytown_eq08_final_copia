@@ -21,7 +21,7 @@ from typing import Optional, Sequence
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from carrito.granprix_carrito.eventos_mision import RegistroEventos  # noqa: E402
 from carrito.granprix_carrito.maquina_pit import Estado  # noqa: E402
-from carrito.granprix_carrito.metricas import calcular, escribir_json  # noqa: E402
+from carrito.granprix_carrito.tablero_extension.metricas import calcular, escribir_json  # noqa: E402
 from evidencia import archivos_falsos as af  # noqa: E402
 from evidencia import verificar_evidencias as ve  # noqa: E402
 from simulacion.mision_simulada import Mundo  # noqa: E402

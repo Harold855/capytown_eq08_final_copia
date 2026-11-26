@@ -11,7 +11,7 @@ Se empezó con estados, temporización y seguridad **dentro de `maquina_pit.py`*
 | `carrito/granprix_carrito/maquina_pit.py` | Estados y transiciones, `MaquinaPit`, plazos por estado (`_plazo`), `Seguridad`, `SalidaSegura` y `Puerto` |
 | `carrito/granprix_carrito/mision.py` | `Mision` (estaciones, vueltas, piezas, registro de pits) y `cargar_mision` |
 | `carrito/config/mision.yaml` | Equipo, vueltas, cadena de piezas, plazos y seguridad |
-| `carrito/nodos/adaptador_ros.py` | Nodo `maquina_pit`: conecta el núcleo con ROS 2 |
+| `carrito/granprix_carrito/adaptador_ros.py` | Nodo `maquina_pit`: conecta el núcleo con ROS 2 |
 | `tests/carrito/test_maquina_pit.py` | Estados, transiciones, plazos, seguridad e intercambio, fallos (49 pruebas) |
 | `tests/carrito/test_mision.py` | Configuración, estaciones, piezas y vueltas (14) |
 | `tests/carrito/test_adaptador_ros.py` | Cableado del nodo con `rclpy` sustituto (21) |

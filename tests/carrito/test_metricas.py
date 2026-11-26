@@ -13,7 +13,7 @@ from unittest import mock
 RAIZ = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(RAIZ))
 from carrito.granprix_carrito import cronometro as cr
-from carrito.granprix_carrito import metricas as me
+from carrito.granprix_carrito.tablero_extension import metricas as me
 from carrito.granprix_carrito.eventos_mision import Evento, RegistroEventos, leer_eventos
 from simulacion.mision_simulada import Mundo
 

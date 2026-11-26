@@ -1,6 +1,6 @@
 """Indicadores del ROSCar consolidados desde los eventos de la misión (`eventos.jsonl`).
 
-    python3 -m carrito.granprix_carrito.metricas carpeta [--salida datos.json] [--cada 0.5] [--intervenciones N]
+    python3 -m carrito.granprix_carrito.tablero_extension.metricas carpeta [--salida datos.json] [--cada 0.5] [--intervenciones N]
 
 Devuelve un dict serializable (lo que lee el panel). Todo dato que no existe es None: nunca se rellena con ceros. Los puntos
 de la rúbrica son una ESTIMACIÓN del equipo con la rúbrica del HTML (sin `deploy.sh`, sin video ni informe): no son la nota.
@@ -15,11 +15,11 @@ import sys
 import time
 from typing import Dict, List, Optional, Sequence
 
-from . import cronometro as cr
-from .calibracion import evaluar_reduccion
-from .calibracion_tramo import error_normalizado
-from .eventos_mision import Evento, leer_eventos
-from .mision import ConfigMision
+from .. import cronometro as cr
+from ..calibracion import evaluar_reduccion
+from ..calibracion_tramo import error_normalizado
+from ..eventos_mision import Evento, leer_eventos
+from ..mision import ConfigMision
 
 VERSION = 1
 

@@ -34,11 +34,11 @@ am = None
 def setUpModule():
     global am
     rf.instalar()
-    am = importlib.import_module('carrito.nodos.adaptador_ros')
+    am = importlib.import_module('carrito.granprix_carrito.adaptador_ros')
 
 
 def tearDownModule():
-    rf.desinstalar('carrito.nodos.adaptador_ros')
+    rf.desinstalar('carrito.granprix_carrito.adaptador_ros')
 
 
 def js(**kw):

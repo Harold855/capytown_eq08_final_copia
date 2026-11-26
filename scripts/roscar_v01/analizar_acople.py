@@ -18,7 +18,7 @@ from xml.sax.saxutils import escape
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from carrito.granprix_carrito.calibracion import evaluar_reduccion  # noqa: E402
 from carrito.granprix_carrito.calibracion_tramo import CAMPOS_PARADAS  # noqa: E402
-from carrito.granprix_carrito.metricas import percentil  # noqa: E402
+from carrito.granprix_carrito.tablero_extension.metricas import percentil  # noqa: E402
 
 
 def _num(x):

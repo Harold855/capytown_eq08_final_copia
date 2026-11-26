@@ -438,7 +438,7 @@ def verificar(raiz: str, spec: Spec = Spec(), ventanas: Optional[Dict[int, Tuple
     _csvs(inf, csvs, spec)
     reg_ruta = os.path.join(raiz, 'registro_experimental.jsonl')
     if os.path.exists(reg_ruta):
-        from evidencia.registro_experimental import verificar_ruta
+        from carrito.granprix_carrito.registro_experimental import verificar_ruta
         for p in verificar_ruta(reg_ruta, raiz) or ['íntegro']:
             inf.add('OK' if p == 'íntegro' else 'FALLA', 'registro_experimental.jsonl', p)
     return inf

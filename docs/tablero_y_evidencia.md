@@ -7,13 +7,13 @@ Esta parte puntúa (evidencia 3 puntos, tablero 2) pero **no bloquea la navegaci
 | Archivo | Función | Prioridad |
 |---|---|---|
 | `carrito/granprix_carrito/eventos_mision.py` | Eventos de nuestra lógica en JSONL (`eventos.jsonl`) | P0 |
-| `evidencia/registro_experimental.py` | Registro de las pruebas de laboratorio, encadenado por hash | P0 |
+| `carrito/granprix_carrito/registro_experimental.py` | Registro de las pruebas de laboratorio, encadenado por hash | P0 |
 | `carrito/granprix_carrito/cronometro.py` | Tiempos de vuelta, sectores, tramos y pits desde los eventos | P1 |
-| `carrito/granprix_carrito/metricas.py` | Indicadores consolidados (el JSON del panel) | P1 |
+| `carrito/granprix_carrito/tablero_extension/metricas.py` | Indicadores consolidados (el JSON del panel) | P1 |
 | `evidencia/verificar_evidencias.py` (+ `evidencia.yaml`) | Comprueba que la evidencia existe y tiene contenido | P1 |
 | `tablero/datos_simulados.py` | Datos de prueba para el panel, también en vivo | P1 |
 | `tablero/panel.html`, `panel.js`, `panel.css` | Prototipo de extensión del tablero | P1 |
-| `tests/carrito/test_metricas.py` (46), `tests/evidencia/test_registro_experimental.py` (24), `test_verificar_evidencias.py` (39) | Pruebas | — |
+| `tests/carrito/test_metricas.py` (46), `tests/evidencia/test_registro_experimental.py` (24; prueba un módulo de `carrito/`), `test_verificar_evidencias.py` (39) | Pruebas | — |
 | `evidencia/archivos_falsos.py` | Genera evidencia sintética con fallos conocidos (para probar) | — |
 
 Eventos y métricas son lo que ya genera `MaquinaPit` (`eventos=` opcional; por defecto en memoria). Un fallo al escribir el registro **nunca** detiene la misión (una prueba lo fuerza).
@@ -26,7 +26,7 @@ Una línea por evento: `ts` (reloj de pared), `tipo`, `estado`, `vuelta`, `estac
 
 - **Vuelta** = desde la llegada a E1 hasta el fin del pit de E4 (la misma que se publica en `vuelta`). **Sectores:** S1 llegada E1 → llegada E2, S2 E2 → E3, S3 E3 → E4, S4 llegada E4 → fin de su pit. Suman exactamente la vuelta (una prueba lo exige). Cada sector incluye el pit de su estación de salida. Lo que falta queda en `None`.
 - **Métricas:** vueltas cerradas y válidas, pits (tiempo medio, máximo, p95, lentos, con corrección, reintentos), errores antes y después (media y p95), fracción de paradas que mejoran (el criterio del 70 %, con y sin las que ya llegaron dentro), escalas (inicial, final, si convergen: el mismo criterio que el estimador), fallas y la **estimación** de puntos de tanda y de pieza. Los puntos de autonomía solo se calculan si se da el número de intervenciones (`--intervenciones`); nada se rellena con ceros.
-- `python3 -m carrito.granprix_carrito.metricas CARPETA --salida datos.json [--cada 0.5]` (escritura atómica: el panel nunca lee un archivo a medias).
+- `python3 -m carrito.granprix_carrito.tablero_extension.metricas CARPETA --salida datos.json [--cada 0.5]` (escritura atómica: el panel nunca lee un archivo a medias).
 
 ## Verificador de evidencia
 
@@ -50,7 +50,7 @@ Por cada vuelta se espera un MP4 y un CSV con el número de vuelta en el nombre 
 
 ## Registro experimental
 
-`evidencia/registro_experimental.py agregar | listar | verificar | exportar`. Una línea JSON por prueba (tipo, robot, operador, estado `ok|fallo|parcial|abortado`, parámetros, resultados, notas, archivos adjuntos con SHA-256, `corrige`). **Solo se añade**: las pruebas fallidas se registran igual y una corrección es un registro nuevo. Cada línea lleva el hash de la anterior: se detecta que se edite, borre a mitad o reordene una línea, y que un adjunto cambie después. **No detecta** que se borren las últimas líneas ni que alguien reescriba todo el archivo; por eso conviene exportar el CSV y subirlo al repositorio. Un corte a mitad de línea se avisa y no deja seguir hasta revisarlo. Complementa la bitácora escrita (`docs/bitacora_laboratorio.md`); no la sustituye.
+`python3 -m carrito.granprix_carrito.registro_experimental agregar | listar | verificar | exportar`. Una línea JSON por prueba (tipo, robot, operador, estado `ok|fallo|parcial|abortado`, parámetros, resultados, notas, archivos adjuntos con SHA-256, `corrige`). **Solo se añade**: las pruebas fallidas se registran igual y una corrección es un registro nuevo. Cada línea lleva el hash de la anterior: se detecta que se edite, borre a mitad o reordene una línea, y que un adjunto cambie después. **No detecta** que se borren las últimas líneas ni que alguien reescriba todo el archivo; por eso conviene exportar el CSV y subirlo al repositorio. Un corte a mitad de línea se avisa y no deja seguir hasta revisarlo. Complementa la bitácora escrita (`docs/bitacora_laboratorio.md`); no la sustituye.
 
 ## Panel (`tablero/`)
 

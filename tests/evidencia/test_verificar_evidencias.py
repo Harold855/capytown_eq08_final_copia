@@ -15,7 +15,7 @@ from carrito.granprix_carrito.eventos_mision import RegistroEventos
 from comun.yaml_estricto import ErrorYaml
 from evidencia import archivos_falsos as af
 from evidencia import verificar_evidencias as ve
-from evidencia.registro_experimental import RegistroExperimental
+from carrito.granprix_carrito.registro_experimental import RegistroExperimental
 from simulacion.mision_simulada import Mundo
 
 SPEC = ve.cargar_spec()

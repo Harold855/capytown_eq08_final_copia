@@ -41,7 +41,7 @@ Entre máquinas solo hay MQTT, HTTP y SSH. ROS 2 vive dentro del Pi5. `twist_mux
 |---|---|---|---|
 | `control_odometria` | Equipo | `carrito/granprix_carrito/`: `planificador`, `ejecutor`, `calibracion` | Lógica **simulada**. No es un nodo ROS aún |
 | `camara_apriltag` | Equipo (base del curso) | `vision/` (medición, calibración, corrector de distorsión) | Medición (`vision/medicion.py`, `scripts/camara/medir_tag.py`), calibración y corrección de distorsión **simuladas**. El nodo `nodos/camara_apriltag_node.py` está escrito (solo probado contra un sustituto de `rclpy`) |
-| `maquina_pit` | Equipo | `maquina_pit.py` + `mision.py` (usan `acople`, `CalibradorTramo`, `EjecutorMovimiento`, `planificador`) y `nodos/adaptador_ros.py` | Máquina **simulada de punta a punta**; el nodo, solo contra un sustituto de `rclpy` (ver `mision.md`) |
+| `maquina_pit` | Equipo | `maquina_pit.py` + `mision.py` (usan `acople`, `CalibradorTramo`, `EjecutorMovimiento`, `planificador`) y `adaptador_ros.py` | Máquina **simulada de punta a punta**; el nodo, solo contra un sustituto de `rclpy` (ver `mision.md`) |
 | `puente_mqtt`, `vigilante_red`, `tablero_web`, `grabador` | Curso | `integracion/` solo describe la conexión y los tópicos | Sin verificar con un broker real |
 | `placa_micro_ros` | Yahboom | `scripts/roscar_v01/` la diagnostica (solo lectura) | Sin verificar en el robot |
 
@@ -76,8 +76,8 @@ carrito.granprix_carrito
   maquina_pit      -> acople, calibracion_tramo, configuracion, docks, ejecutor, mision, planificador, pose_dock, geometria_dock
   eventos_mision   (sin dependencias)
   cronometro       -> eventos_mision
-  metricas         -> cronometro, calibracion, calibracion_tramo, eventos_mision, mision
-  nodos/adaptador_ros   -> maquina_pit, acople, calibracion_tramo, mision, pose_dock, transformacion_camara_dock, gestor_reset   (rclpy solo dentro de _clase_nodo)
+  tablero_extension/metricas -> cronometro, calibracion, calibracion_tramo, eventos_mision, mision
+  adaptador_ros    -> maquina_pit, acople, calibracion_tramo, mision, pose_dock, transformacion_camara_dock, gestor_reset   (rclpy solo dentro de _clase_nodo)
   nodos/nodo_reset_pose -> gestor_reset, transformacion_camara_dock, pose_dock, reset_pose          (rclpy)
   nodos/tag_emulado     -> gestor_reset, transformacion_camara_dock, docks                         (rclpy solo dentro de _clase_nodo)
   nodos/camara_apriltag_node -> gestor_reset, vision.medicion                                      (rclpy solo dentro de _clase_nodo)
@@ -100,9 +100,11 @@ vision
   calibracion_damero    -> herramienta, calibracion_focal
   medicion              -> herramienta, calibracion_focal      (CamaraTag, agregar, FiltroMediana, evidencia)
 
-evidencia
+carrito.granprix_carrito
   registro_experimental (sin dependencias)
-  verificar_evidencias  -> comun, registro_experimental, carrito.eventos_mision
+
+evidencia
+  verificar_evidencias  -> comun, carrito.registro_experimental, carrito.eventos_mision
   archivos_falsos       -> carrito.mision, comun
 tablero
   datos_simulados       -> carrito.metricas, evidencia, simulacion.mision_simulada
@@ -153,7 +155,7 @@ Orden del curso: medir → acoplar → solicitar → esperar resultado → medir
 El estimador necesita la pose medida **antes** de cualquier acople, y el comando **realmente enviado**: de otro modo converge a un valor sesgado.
 
 ## 7. Adaptadores pendientes (aquí se conecta lo demás)
-1. **Ejecutor → ROS 2:** hecho en `nodos/adaptador_ros.py` (`Twist`, `odom_ok()` desde `/odom`, temporizador a 20 Hz), **solo contra un sustituto de `rclpy`**; falta comprobar el *timeout* de `twist_mux` y los nombres de tópicos del curso.
+1. **Ejecutor → ROS 2:** hecho en `adaptador_ros.py` (en `granprix_carrito/`) (`Twist`, `odom_ok()` desde `/odom`, temporizador a 20 Hz), **solo contra un sustituto de `rclpy`**; falta comprobar el *timeout* de `twist_mux` y los nombres de tópicos del curso.
 2. **Cámara → ROS 2:** `carrito/nodos/camara_apriltag_node.py` (usa `CamaraTag`: corrige la distorsión, filtra por calidad y publica `/tag/pose`) está escrito pero **solo probado contra un sustituto de `rclpy`**; para el simulador RC-1, `tag_emulado.py` publica la misma medición emulada a partir de `/sim/pose`.
 3. **Pit → MQTT:** publicar `solicitud` y `evento` y leer `resultado` y `turno` con los tópicos de `mqtt.yaml`, a través de `puente_mqtt` (del curso).
 4. **Brazo:** implementar `BrazoJetCobot` según la firma que publique el docente y ajustar `puerto.py`.

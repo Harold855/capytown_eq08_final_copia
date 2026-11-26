@@ -11,8 +11,8 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(RAIZ))
-from evidencia import registro_experimental as re_
-from evidencia.registro_experimental import ErrorRegistro, RegistroExperimental, verificar_ruta
+from carrito.granprix_carrito import registro_experimental as re_
+from carrito.granprix_carrito.registro_experimental import ErrorRegistro, RegistroExperimental, verificar_ruta
 
 
 class Base(unittest.TestCase):

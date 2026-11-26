@@ -109,7 +109,7 @@ Detalle del entorno en [`docs/entorno_desarrollo.md`](docs/entorno_desarrollo.md
 
 ## Organización del repositorio
 
-- `carrito/`: lógica del ROSCar (docks, planificador, ejecutor, estimadores, acople, máquina de la misión, configuración) y `nodos/` con el nodo ROS 2 del reset de pose; el resto aún no son nodos.
+- `carrito/`: lógica del ROSCar (docks, planificador, ejecutor, estimadores, acople, máquina de la misión, configuración) `adaptador_ros.py` (nodo de la misión) y `nodos/` con los demás nodos ROS 2 (reset de pose, cámara, tag emulado). Árbol completo en [`carrito/README.md`](carrito/README.md).
 - `estacion/`: estrategia de cambio de pieza (`app_equipo`) con brazo simulado. El supervisor es del curso.
 - `vision/`: medición del AprilTag y calibración de la cámara. `integracion/`: configuración MQTT. `comun/`, `geometria_dock/`: utilidades compartidas.
 - `simulacion/`: modelo del simulador del HTML, barridos de parámetros e imágenes sintéticas.

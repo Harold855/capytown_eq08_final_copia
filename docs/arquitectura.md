@@ -40,7 +40,7 @@ Entre máquinas solo hay MQTT, HTTP y SSH. ROS 2 vive dentro del Pi5. `twist_mux
 | Nodo del curso | Dueño | Nuestra pieza | Estado |
 |---|---|---|---|
 | `control_odometria` | Equipo | `carrito/granprix_carrito/`: `planificador`, `ejecutor`, `calibracion` | Lógica **simulada**. No es un nodo ROS aún |
-| `camara_apriltag` | Equipo (base del curso) | `vision/` (medición, calibración, corrector de distorsión) | Medición y calibración **simuladas**. Falta el nodo y `/tag/pose` |
+| `camara_apriltag` | Equipo (base del curso) | `vision/` (medición, calibración, corrector de distorsión) | Medición (`vision/medicion.py`, `scripts/camara/medir_tag.py`), calibración y corrección de distorsión **simuladas**. Falta el nodo y `/tag/pose` |
 | `maquina_pit` | Equipo | usa `planificar_acople`, `acople_valido`, `EstimadorEscalas`, `evaluar_reduccion` | **Pendiente** la máquina de estados |
 | `puente_mqtt`, `vigilante_red`, `tablero_web`, `grabador` | Curso | `integracion/` solo describe la conexión y los tópicos | Sin verificar con un broker real |
 | `placa_micro_ros` | Yahboom | `scripts/roscar_v01/` la diagnostica (solo lectura) | Sin verificar en el robot |
@@ -83,6 +83,7 @@ vision
   calibracion_focal     -> comun            (matemática pura y archivo YAML; no necesita OpenCV)
   calibrar              -> herramienta, calibracion_focal
   calibracion_damero    -> herramienta, calibracion_focal
+  medicion              -> herramienta, calibracion_focal      (CamaraTag, agregar, FiltroMediana, evidencia)
 
 simulacion
   modelo_granprix       -> carrito.docks, carrito.planificador, geometria_dock
@@ -118,7 +119,7 @@ Orden del curso: medir → acoplar → solicitar → esperar resultado → medir
 
 | Paso | Función existente | Falta |
 |---|---|---|
-| medir la pose | `vision.herramienta.pose_tag` / `pose_tag_calibrada` | nodo de cámara y `/tag/pose`; marco del dock |
+| medir la pose | `vision.medicion.CamaraTag.medir` y `agregar` (o `scripts/camara/medir_tag.py`) | nodo de cámara y `/tag/pose`; marco del dock |
 | ¿está dentro de tolerancia? | `acople_valido`, `error_acople` | — |
 | corregir | `planificar_acople` + `EjecutorMovimiento` | orquestarlo con reintentos |
 | solicitud / resultado | constructores de `scripts/roscar_v01/mensajes_contrato.py`, tópicos de `mqtt.yaml` | publicarlos vía `puente_mqtt` |
@@ -129,7 +130,7 @@ El estimador necesita la pose medida **antes** de cualquier acople, y el comando
 
 ## 7. Adaptadores pendientes (aquí se conecta lo demás)
 1. **Ejecutor → ROS 2:** una `Salida` que publique `Twist` en la entrada autorizada de `twist_mux`, un `odom_ok()` basado en `/odom`, un temporizador a 20 Hz que llame a `paso()`, y comprobar el *timeout* de `twist_mux`.
-2. **Cámara → ROS 2:** un nodo que use `Corrector` y `pose_tag_calibrada` y publique `/tag/pose`.
+2. **Cámara → ROS 2:** un nodo que use `CamaraTag` (corrige la distorsión, filtra por calidad y agrega cuadros) y publique `/tag/pose`.
 3. **Pit → MQTT:** publicar `solicitud` y `evento` y leer `resultado` y `turno` con los tópicos de `mqtt.yaml`, a través de `puente_mqtt` (del curso).
 4. **Brazo:** implementar `BrazoJetCobot` según la firma que publique el docente y ajustar `puerto.py`.
 5. **Diagnóstico:** `diagnostico_roscar.recolectar` y `prueba_movimiento.py` ya usan `rclpy` y nunca se ejecutaron.

@@ -33,6 +33,7 @@ Qué hay y cuándo leerlo. Los documentos están agrupados por lo que se necesit
 | [`apriltag_sin_robot.md`](apriltag_sin_robot.md) | Qué se puede probar sin robot, cifras de precisión, el efecto de la calibración y de la distorsión |
 | [`procedimiento_calibracion_camara.md`](procedimiento_calibracion_camara.md) | Calibrar la focal con regla y tag (primero) y validarla fuera del eje |
 | [`procedimiento_calibracion_damero.md`](procedimiento_calibracion_damero.md) | Calibrar con damero, incluida la distorsión (solo si lo anterior falla fuera del eje) |
+| [`procedimiento_medir_tag.md`](procedimiento_medir_tag.md) | Medir la pose del tag con la cámara calibrada, motivos de rechazo y cómo validarla con regla y transportador |
 
 ## Para el día de laboratorio con el JetCobot
 | Documento | Qué contiene |

@@ -40,9 +40,9 @@ Cada requisito indica su fuente, qué parte del código lo cubre, qué prueba lo
 
 | ID | Requisito | Fuente | Cobertura | Prueba | Estado |
 |---|---|---|---|---|---|
-| RQ-23 | AprilTag `tag36h11` de 6 cm; pose medida por el carrito en el marco del dock | README §8, doc. 03 | `vision/herramienta.py` sobre la herramienta del docente; `simulacion/apriltag_sintetico.py` | `tests/vision/test_apriltag_sintetico.py` | Simulado. **Falta** el marco del dock (`dock_frames.yaml`) y el nodo de cámara |
+| RQ-23 | AprilTag `tag36h11` de 6 cm; pose medida por el carrito en el marco del dock | README §8, doc. 03 | `vision/herramienta.py` y `vision/medicion.py` (`medir_tag.py`) sobre la herramienta del docente; `simulacion/apriltag_sintetico.py` | `test_apriltag_sintetico.py`, `test_medicion.py` | Simulado. **Falta** el marco del dock (`dock_frames.yaml`) y el nodo de cámara |
 | RQ-24 | Precisión de la pose suficiente para decidir con margen una tolerancia de 4 cm y 6° | división §1.3 | calibración de cámara con regla y con damero; barridos de precisión | `tests/vision/` | Simulado. Hallazgo: con un campo de visión supuesto 6 % mal, `z` falla 2 cm. **Pendiente** medir con la cámara real |
-| RQ-25 | No hay falsas aceptaciones: ante dos tags o ninguno no se mide | división §1.3 | `pose_tag` devuelve `None` | `test_apriltag_sintetico.py` | Verificado (lógica). Sin umbrales reales de `margen` y `hamming` |
+| RQ-25 | No hay falsas aceptaciones: ante dos tags, otro id, poca calidad o inestabilidad no se entrega pose | división §1.3 | `CamaraTag.medir` y `agregar`: la medición no válida lleva el motivo (`sin_tag`, `otro_id`, `varios_tags`, `hamming`, `margen_bajo`, `inestable_*`...) y **sin pose** | `test_medicion.py`, `test_apriltag_sintetico.py` | Verificado (lógica). Umbrales de margen, hamming y dispersión **provisionales** |
 | RQ-26 | Corregir la distorsión del lente si la hay | división §1.3 | `Corrector`, `pose_tag_calibrada`, `calibrar_damero.py` | `test_calibracion_damero.py` | Simulado |
 
 ## 4. Estación

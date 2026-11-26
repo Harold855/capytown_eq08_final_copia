@@ -13,7 +13,7 @@ Qué hay que tener en cada máquina y qué está **verificado**. Lo no verificad
 ```bash
 bash scripts/preparar_entorno.sh            # crea .venv e instala requirements-dev.txt
 source .venv/bin/activate
-bash scripts/ejecutar_pruebas.sh            # 333 pruebas (≈ 40 s); "TODO OK" si pasan. Las de visión se omiten si falta OpenCV
+bash scripts/ejecutar_pruebas.sh            # 375 pruebas (≈ 45 s); "TODO OK" si pasan. Las de visión se omiten si falta OpenCV
 ```
 En Windows sin WSL: `py -m venv .venv`, `.venv\Scripts\activate`, `pip install -r requirements-dev.txt` y `python -m unittest discover -s tests/estacion` (y análogo para los otros directorios). El script `.sh` necesita bash.
 

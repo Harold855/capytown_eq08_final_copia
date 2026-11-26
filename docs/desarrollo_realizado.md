@@ -27,8 +27,8 @@ Otros documentos: arquitectura en [`arquitectura.md`](arquitectura.md), requisit
 | Configuración YAML | 5 archivos + cargador estricto `comun/yaml_estricto.py` | Verificado |
 | MQTT | `integracion/configuracion/mqtt.yaml`, `mqtt_config.py`, `scripts/roscar_v01/mensajes_contrato.py` | Verificado contra el contrato del docente; **sin broker real** |
 | Estación (JetCobot) | `estacion/` estrategia, roles, compensación, poses, brazo simulado; `scripts/jetcobot_v01/` | Simulado; **nunca contra un brazo** |
-| Visión sin robot | `vision/`, `simulacion/*sintetico.py`, calibración con regla y con damero | Simulado (cámara sintética); **nunca con la cámara real** |
-| Pruebas | 333 propias en 8 carpetas | Verificado |
+| Visión sin robot | `vision/`, `simulacion/*sintetico.py`, calibración con regla y con damero, `medir_tag.py` | Simulado (cámara sintética); **nunca con la cámara real** |
+| Pruebas | 375 propias en 8 carpetas | Verificado |
 | Entorno | `scripts/preparar_entorno.sh`, `requirements-*.txt` | Verificado en Linux, Python 3.13 |
 
 **Lo que NO existe:** nodos ROS 2 del carrito (`control_odometria`, `camara_apriltag`, `maquina_pit`), el adaptador ROS 2 del ejecutor, el reset de pose, la máquina de estados del pit, el tablero web, la cinemática y manipulación reales del brazo, y cualquier medición física. La lógica de arriba está lista para conectarse a ellos, pero conectarla es trabajo pendiente.
@@ -76,10 +76,10 @@ simulacion/                    modelo del simulador del HTML, barridos, imágene
 scripts/
   roscar_v01/                  inicio del ROSCar: preflight, diagnóstico, prueba de movimiento, registro, análisis
   jetcobot_v01/                diagnóstico (solo lectura) y cronómetro del JetCobot
-  camara/                      calibrar_focal.py (regla) y calibrar_damero.py
+  camara/                      calibrar_focal.py (regla), calibrar_damero.py y medir_tag.py
   historicos/                  copias de RC-0 y RC-1 (referencia, sin modificar)
   preparar_entorno.sh, ejecutar_pruebas.sh
-tests/                         una carpeta por paquete (333 pruebas)
+tests/                         una carpeta por paquete (375 pruebas)
 experimentos/                  plantillas de evidencia (vacío de mediciones reales)
 requirements-dev.txt, requirements-vision.txt
 ```
@@ -146,6 +146,7 @@ Reglas que el cargador hace cumplir: una configuración **no puede aflojar el re
 - `simulacion/apriltag_sintetico.py` y `damero_sintetico.py` renderizan un tag o un damero con pose, cámara y distorsión conocidas (`lente.py`), para medir el error contra la verdad.
 - **Calibración con regla** (`calibrar_focal.py capturar | calcular | validar`): ajusta la focal y el desfase de la regla con una regresión sobre varias distancias, sin damero. Rechaza ajustes incoherentes y valida también fuera del eje. Procedimiento: [`procedimiento_calibracion_camara.md`](procedimiento_calibracion_camara.md).
 - **Calibración con damero** (`calibrar_damero.py crear | capturar | calcular | validar`): focal, punto principal y distorsión. Captura automática, rechazo automático de imágenes atípicas, validación cruzada. Procedimiento: [`procedimiento_calibracion_damero.md`](procedimiento_calibracion_damero.md). Se usa solo si la validación fuera del eje de la regla falla.
+- **Medición** (`medir_tag.py una | continuo | comparar | resumen`, núcleo en `vision/medicion.py`): corrige la distorsión, rechaza las detecciones dudosas (`sin_tag`, `otro_id`, `varios_tags`, `hamming`, `margen_bajo`...), agrega varios cuadros con mediana y dispersión, y solo entrega pose si la medición es aceptada. `comparar` guarda en un CSV la comparación con regla y transportador (también lo que falla) y `resumen` la evalúa. La pose es en el **sistema de la cámara**, no en el marco del dock. Umbrales de calidad **provisionales**. Procedimiento: [`procedimiento_medir_tag.md`](procedimiento_medir_tag.md).
 - Detalle y cifras: [`apriltag_sin_robot.md`](apriltag_sin_robot.md).
 
 ### 4.10 Entorno y pruebas
@@ -167,6 +168,8 @@ Reglas que el cargador hace cumplir: una configuración **no puede aflojar el re
 | 10 | `pupil-apriltags 1.0.4` aborta el proceso con corrupción de memoria al usar `tag25h9` en la prueba parametrizada del docente. `tag36h11` (el del reto) funciona: 24 pruebas pasan | `docs/apriltag_sin_robot.md`; verificado, causa sin investigar |
 | 11 | Con duraciones de ejemplo, la estación tarda 15.4 s en E2/E3 y el pit total es de 10 s | `estacion/README.md`; **placeholders**, no medición |
 | 12 | Datos heredados de RC-1 (no son de este reto): el robot gira 7–11 % más de lo ordenado, con dispersión de ±3.5°; `/odom` ≈ 11 Hz con retardo de 0.5–0.65 s; el firmware conserva la última orden si el nodo muere | `docs/contexto_analisis.md`; medidos en otro robot |
+| 13 | En simulación una detección sana da margen de decisión de 105 a 120, con poco contraste 23–47 y movida ~53, y la pose sale exacta en todos los casos: el margen sirve para rechazar falsas detecciones, no predice el error de pose. Los umbrales de `medir_tag` (margen 30, hamming 0) son provisionales | medición ad hoc con `simulacion/apriltag_sintetico.py`; simulado |
+| 14 | Una medición completa (con corrección de distorsión) tarda ~20–30 ms por cuadro en una PC de 4 núcleos; en el Pi 5 no está medido y cuenta contra los 10 s del pit | medición ad hoc, sin script; **sin verificar** en el robot |
 
 ## 6. Errores propios y correcciones
 
@@ -202,8 +205,8 @@ bash scripts/ejecutar_pruebas.sh                   # "TODO OK" si pasan
 | `tests/jetcobot_v01` | 11 | diagnóstico y cronómetro |
 | `tests/carrito` | 97 | docks, planificador, equivalencia con el HTML, ejecutor, estimadores, configuración |
 | `tests/comun` | 15 | cargador YAML estricto |
-| `tests/vision` | 106 | AprilTag sintético, calibración con regla y con damero (≈ 40 s; se omiten si falta OpenCV) |
-| **Total propias** | **333** | |
+| `tests/vision` | 148 | AprilTag sintético, calibración con regla y con damero, medición con `medir_tag` (≈ 45 s; se omiten si falta OpenCV) |
+| **Total propias** | **375** | |
 
 Además, las del docente: `pc-race` (126, en el entorno con `--pc-race`) y la herramienta AprilTag (24 con `-k "not tag25h9 and not tag16h5"`).
 
@@ -236,7 +239,7 @@ Preguntas para el docente que siguen abiertas (README sección 15 las lista): fi
 |---|---|
 | 1.1 Diagnóstico del ROSCar | Herramientas listas (`diagnostico_roscar`, `preflight`, registro, análisis, procedimiento). **Pendiente:** correrlas en el robot |
 | 1.2 Planificación y ejecución | Planificador y ejecutor hechos (simulados). **Pendiente:** adaptador ROS 2, medir pausa y asentamiento |
-| 1.3 Visión y localización | Medición del tag y calibración de cámara hechas (simuladas). **Pendiente:** nodo de cámara, `/tag/pose`, reset de pose, marcos |
+| 1.3 Visión y localización | Medición del tag (`medir_tag.py`) y calibración de cámara hechas (simuladas). **Pendiente:** nodo de cámara, `/tag/pose`, reset de pose, marcos |
 | 1.4 Acople y calibración adaptativa | Lógica del acople y estimadores `cd`/`ca` hechos. **Pendiente:** la máquina de estados del pit |
 | 1.5 Autonomía y seguridad | Condiciones de aborto del ejecutor. **Pendiente:** verificar `twist_mux` y la parada |
 | 1.6 Tablero web y registro | Sin iniciar (solo constructores de mensajes y plantillas de evidencia) |
@@ -245,7 +248,7 @@ Preguntas para el docente que siguen abiertas (README sección 15 las lista): fi
 | 2.4 Compensación de la cuna | Hecha con marcos supuestos |
 | 2.5 Estrategia de cambio / 2.6 Seguridad | Hechas y simuladas; falla cerrada |
 | 3.1 Arquitectura y contrato | Configuración MQTT y mensajes verificados contra el docente |
-| 3.2 Simulación y pruebas independientes | Entorno, 333 pruebas, modelo del HTML |
+| 3.2 Simulación y pruebas independientes | Entorno, 375 pruebas, modelo del HTML |
 | 3.3 Integración del pit / 3.4 de la carrera | Sin iniciar (existe el tiempo ideal de una vuelta) |
 | 3.5 Experimentación y predicción | Herramientas listas (modelo del HTML, barridos). **Pendiente:** predicción firmada con parámetros medidos |
 | 3.6 Evidencias / 3.7 Carrera | Plantillas; sin evidencia real |
@@ -257,14 +260,14 @@ Preguntas para el docente que siguen abiertas (README sección 15 las lista): fi
 1. `preflight.sh` y `diagnostico_roscar.py`; no seguir si hay FALLA.
 2. Caracterización de rectas y giros (`prueba_movimiento.py`, `registrar_medicion.py`, `analizar_movimientos.py`) con las limitaciones de seguridad de su README. Sembrar `calibracion.yaml` con lo medido.
 3. Medir `pausa_s`, `asentamiento_s` y el *timeout* de `twist_mux`.
-4. Calibrar la cámara con regla y validar con el tag a los lados; si falla, damero.
+4. Calibrar la cámara con regla y validar con el tag a los lados; si falla, damero. Después, `medir_tag.py comparar` con regla y transportador en decenas de puntos y `resumen`.
 5. JetCobot: `diagnostico_jetcobot.py` y `cronometro_ciclo.py`; confirmar la API de `BrazoJetCobot`; ensayar el tiempo de E2.
 6. Anotar todo en `docs/bitacora_laboratorio.md`, también lo que falle.
 
 **Sin robot, por prioridad:**
 1. Adaptador ROS 2 del ejecutor (Twist, `/odom`, reloj) y de `diagnostico_roscar`.
 2. Máquina de estados del pit (medir → acoplar → solicitar → esperar resultado → medir → reset → recalibrar, con reintentos): usa lo ya hecho.
-3. `medir_tag.py`: captura, corrige la distorsión y devuelve la pose; reset de pose.
+3. Reset de pose (`map → odom`) con la pose medida, y el nodo de cámara que use `CamaraTag` y publique `/tag/pose`.
 4. Prueba de integración contra `pc-race` con un Mosquitto real.
 5. Fusionar *waypoints* de la estación una vez medidos los tiempos reales.
 6. Predicción firmada con el modelo del HTML y los parámetros medidos.

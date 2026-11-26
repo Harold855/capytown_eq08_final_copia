@@ -60,6 +60,6 @@ Con `pupil-apriltags 1.0.4` la prueba parametrizada del docente con `tag25h9` ab
 ## Qué falta para cerrar la visión (necesita el laboratorio)
 1. Imprimir el tag al 100 % y medir su lado con regla.
 2. Calibrar la cámara del ROSCar: `scripts/camara/calibrar_focal.py` ya está hecho y probado con una cámara sintética (ajusta focal y offset de la regla con el tag a varias distancias y lo valida también fuera del eje); falta usarlo con la cámara real. Procedimiento: [`procedimiento_calibracion_camara.md`](procedimiento_calibracion_camara.md). Si el lente distorsiona (la validación fuera del eje falla), se usa el damero: `scripts/camara/calibrar_damero.py`, procedimiento en [`procedimiento_calibracion_damero.md`](procedimiento_calibracion_damero.md).
-3. Medir la pose del tag a distancias y ángulos conocidos con regla y transportador, y comparar con la simulación.
+3. Medir la pose del tag a distancias y ángulos conocidos con regla y transportador, y comparar con la simulación: `scripts/camara/medir_tag.py comparar` y `resumen` ya lo hacen ([`procedimiento_medir_tag.md`](procedimiento_medir_tag.md)); falta usarlo con la cámara real.
 4. Medir el montaje de la cámara y recibir/definir el marco del dock.
 5. Decidir umbrales de `margen` y `hamming` con datos reales.

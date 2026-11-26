@@ -2,7 +2,7 @@
 
 **Cuándo usarlo:** solo si la validación del método de la regla falla **fuera del eje** (`docs/procedimiento_calibracion_camara.md`, paso 6). Ese método ajusta la focal pero no ve la distorsión. En simulación, con barril `k1 = −0.4`, un tag a 10 cm del centro da 1.7 cm de error en `z` sin que el ajuste lo note. Si el paso 6 cumple (≤ 1 cm a los lados), **no hace falta este procedimiento**.
 
-**Estado:** matemática y script probados con una cámara sintética de parámetros y distorsión conocidos (106 pruebas de visión), **no con la cámara real del ROSCar**. Primera vez en hardware: anotar todo lo raro en la bitácora. Dura unos 30 minutos y no mueve el robot.
+**Estado:** matemática y script probados con una cámara sintética de parámetros y distorsión conocidos (148 pruebas de visión), **no con la cámara real del ROSCar**. Primera vez en hardware: anotar todo lo raro en la bitácora. Dura unos 30 minutos y no mueve el robot.
 
 ## Qué entrega
 `camara_calibrada.yaml` con `fx = fy`, punto principal `cx, cy` y los coeficientes `k1, k2` (y `p1, p2, k3` con el modelo `completo`). Con distorsión, **cada imagen debe corregirse antes de detectar el tag**: la herramienta del docente supone un lente sin distorsión y su comando `detectar` **no la corrige**. Por eso con una calibración de damero no se usa el comando de la herramienta tal cual, sino el código del repositorio:
@@ -13,6 +13,7 @@ cam = cargar_camara('experimentos/dia03_damero/camara_calibrada.yaml')
 corrector = Corrector(cam)                                   # los mapas se calculan una vez
 pose = pose_tag_calibrada(imagen, cam, corrector, tamano_m=0.0595)   # corrige y mide; None si no hay un tag
 ```
+Para medir con filtro de calidad, agregación de cuadros y evidencia, usar `scripts/camara/medir_tag.py` ([`procedimiento_medir_tag.md`](procedimiento_medir_tag.md)).
 (El tamaño del tag no se guarda en la calibración de damero: se da al medir.)
 
 ## Material

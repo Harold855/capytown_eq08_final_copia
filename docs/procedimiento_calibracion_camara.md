@@ -78,7 +78,7 @@ Para `izq` y `der`: desplazar el tag lateralmente (hasta que quede cerca del bor
 
 ## 7. Registrar y usar
 - Guardar en la bitácora (`docs/bitacora_laboratorio.md`): fecha, quién, lado del tag medido, resolución, resultado (focal, campo de visión, offset, rms), resultado de la validación y rutas de los archivos.
-- Usar los valores con la herramienta del docente: el comando de `calcular` ya trae `--fx --fy --cx --cy --tamano-mm`. En código: `vision.calibracion_focal.cargar_camara(ruta).tupla()` da `(fx, fy, cx, cy)` para `herramienta_apriltag.detectar_en`.
+- Usar los valores con la herramienta del docente: el comando de `calcular` ya trae `--fx --fy --cx --cy --tamano-mm`. En código: `vision.calibracion_focal.cargar_camara(ruta).tupla()` da `(fx, fy, cx, cy)` para `herramienta_apriltag.detectar_en`. Para medir con filtro de calidad y agregación de cuadros: `scripts/camara/medir_tag.py` ([`procedimiento_medir_tag.md`](procedimiento_medir_tag.md)).
 - **Repetir la calibración** si cambia la cámara, la resolución o el foco, o si el robot se golpea.
 
 ## Errores comunes

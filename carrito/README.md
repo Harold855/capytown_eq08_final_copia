@@ -28,6 +28,16 @@ tramo = pl.planificar_tramo(D[1].pose, (D[2].x, D[2].y))      # E1 -> E2: giro +
 cmd = pl.comandar(tramo, pl.Escalas(cd=1.01, ca=0.988))       # compensado, con duraciones
 ```
 
+## Configuración (`config/` y `configuracion.py`)
+`config/movimiento.yaml` (velocidades y parámetros del ejecutor) y `config/calibracion.yaml` (semilla de las escalas y del estimador). `cargar_carrito(directorio, robot_esperado)` los carga, valida y comprueba que sean coherentes entre sí. Una configuración no puede superar 0.20 m/s ni 0.8 rad/s. Mapa completo y reglas en [`docs/configuracion.md`](../docs/configuracion.md).
+
+```python
+from carrito.granprix_carrito.configuracion import cargar_carrito
+mov, est = cargar_carrito(robot_esperado='eq08-roscar')
+ej = EjecutorMovimiento(salida, reloj, mov.ejecutor)
+cmd = pl.comandar(tramo, est.escalas, mov.v_ref, mov.w_ref, mov.v_max, mov.w_max)
+```
+
 ## Ejecutor de movimiento (`ejecutor.py`)
 Toma un `Comando` y lo ejecuta en lazo abierto: **giro → pausa en ceros → avance → asentamiento en ceros**. No usa ROS: publica por una `Salida` (`publicar(v, w)`) y recibe el reloj por inyección. Se maneja con `paso()` a ~20 Hz y no bloquea.
 
@@ -62,7 +72,7 @@ Detalles que importan:
 
 ```python
 from carrito.granprix_carrito.calibracion import EstimadorEscalas
-est = EstimadorEscalas(robot='g8-roscar')            # o EstimadorEscalas.cargar('calibracion.json', robot_esperado='g8-roscar')
+est = EstimadorEscalas(robot='eq08-roscar')          # o EstimadorEscalas.cargar('calibracion.yaml', robot_esperado='eq08-roscar')
 cmd = pl.comandar(tramo, est.escalas)
 # ... el ejecutor mueve el carrito; antes del acople se mide la pose de llegada con el tag ...
 reg = est.observar(pose_salida_medida, pose_llegada_medida, ej.comando_efectivo(cmd), t=ahora)
@@ -73,7 +83,7 @@ est.escalas, est.convergio(), reg.motivo_cd, reg.motivo_ca
 - **Rechazos registrados**, escala por escala: tramo menor de 10 cm, giro fuera de 20°–150°, razón medido/comandado fuera de [0.5, 1.5], tag ausente, congelado, velocidad distinta. El paso máximo por actualización es 0.05.
 - **No mezcla velocidades:** la escala vale para la `v` y la `ω` con que se calculó (se fijan con la primera observación usada, o al construir con `v_ref`/`w_ref`). RC-1 midió un giro 7–11 % mayor que el ordenado según ω, así que mezclar velocidades contaminaría `ca`. Mientras el planificador use siempre 0.10 m/s y 0.5 rad/s esto no se nota. *Es una inferencia con pocos datos ([Probable]), no una ley medida.*
 - **`congelar()`** fija las escalas para la tanda oficial (3.5.4) y sigue registrando.
-- **Archivo `calibracion.json`** con el identificador del robot; `cargar` falla si el robot no coincide, si hay valores no finitos o fuera de [0.5, 1.5] o si la versión es desconocida (1.1.4: no aplicar parámetros históricos a otro robot). Escritura atómica. Se usa JSON y no YAML porque no hay PyYAML en el entorno de desarrollo; si el curso fija `calibracion.yaml`, es cambiar el formato del archivo.
+- **Archivo `calibracion.yaml`** con el identificador del robot; `cargar` falla si el robot no coincide, si hay valores no finitos o fuera de [0.5, 1.5], claves desconocidas o duplicadas, o versión desconocida (1.1.4: no aplicar parámetros históricos a otro robot). Escritura atómica. `carrito/config/calibracion.yaml` es la semilla editable; el estado generado va a la carpeta del experimento.
 - **`exportar_csv`**: un renglón por observación (razones, escalas antes/después, motivos) para las gráficas del informe.
 - **`evaluar_reduccion`**: fracción de paradas con error posterior menor que el previo (umbral 70 %). Cómo cuenta la rúbrica las paradas que ya estaban dentro de tolerancia **no está confirmado**: la función informa ambas versiones (`excluir_dentro`).
 
@@ -91,7 +101,7 @@ Lectura: en este modelo 0.35 es un buen compromiso y no hay motivo para cambiarl
 
 **Criterio de convergencia** (provisional): al menos 4 actualizaciones usadas y diferencia máxima entre ellas < 0.01. En 300 semillas simuladas no declaró convergencia falsa y la declara entre 8 y 12 pits.
 
-**Lo que no cubre:** la medición de poses (tag), el reset de pose y la secuencia del pit son de otros módulos; aquí se asume que las poses llegan ya medidas y coherentes entre sí. No hay adaptador ROS ni se escribe `calibracion.json` automáticamente: lo decide el nodo que use este módulo.
+**Lo que no cubre:** la medición de poses (tag), el reset de pose y la secuencia del pit son de otros módulos; aquí se asume que las poses llegan ya medidas y coherentes entre sí. No hay adaptador ROS ni se escribe el archivo de estado automáticamente: lo decide el nodo que use este módulo.
 
 ## Verificación
 - **Equivalencia con el HTML oficial:** `simulacion/modelo_granprix.py` usa este planificador y reproduce el `simulate()` original (mismas semillas) en 18 casos y 288 llegadas, con una tolerancia de 1e-9 (`tests/carrito/test_equivalencia_html.py`). La referencia son salidas del JavaScript original ejecutado con Node.js (`tests/carrito/referencia_html.json`).

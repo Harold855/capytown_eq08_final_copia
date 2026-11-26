@@ -13,7 +13,9 @@ estacion/
     posiciones.py          carga y valida poses enseñadas; sin valores por defecto
     estrategia.py          EstrategiaCambio: valida, compensa y ejecuta los pasos
     brazo_simulado.py      brazo y reloj falsos para pruebas y estimación de tiempo
-  config/poses.plantilla.json   plantilla con null: nada se mueve hasta enseñar las poses
+  configuracion.py       carga estacion.yaml: tolerancias, tope de tiempo y geometría (no puede aflojar el reto)
+  config/estacion.yaml          parámetros de la estrategia y geometría (SUPUESTOS marcados)
+  config/poses.plantilla.yaml   plantilla con null: nada se mueve hasta enseñar las poses
 geometria_dock/transformaciones.py   transformaciones 2D (compartidas con el carrito)
 ```
 
@@ -39,7 +41,7 @@ Con 1.0 s por movimiento y 0.4 s por maniobra de pinza (**placeholders, no medic
 6. **Python:** pensado para 3.8 o superior; no se ha probado en la Jetson.
 
 ## Enseñar las poses (en el laboratorio)
-1. Copiar `config/poses.plantilla.json` a `poses_rolN.json`.
+1. Copiar `config/poses.plantilla.yaml` a `poses_rolN.yaml` (también se acepta `.json`).
 2. Con el carrito en su pose nominal (cruz del dock), mover el brazo con el método autorizado y leer `get_coords()` en cada punto (mm y grados).
 3. Rellenar solo lo que el rol necesita; las listas de bandeja llevan 4 poses.
-4. Cargar con `app_equipo.posiciones.cargar(ruta)`: rechaza valores en metros, fuera de ±600 mm y listas de otro tamaño.
+4. Cargar con `app_equipo.posiciones.cargar(ruta)`: rechaza valores en metros, fuera de ±600 mm, listas de otro tamaño, claves desconocidas y duplicadas. Más en [`docs/configuracion.md`](../docs/configuracion.md).

@@ -3,3 +3,4 @@
 pydantic>=2.6      # pruebas del contrato MQTT contra los modelos del docente
 pytest>=8          # pruebas heredadas de RC-0 (scripts/historicos/rc0/test)
 ruff>=0.4          # estilo (opcional)
+pyyaml>=6        # configuraciones YAML (carrito/config, estacion/config, integracion/configuracion). En ROS 2 viene como python3-yaml

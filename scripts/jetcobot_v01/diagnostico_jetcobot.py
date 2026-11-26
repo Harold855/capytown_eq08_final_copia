@@ -118,6 +118,11 @@ def main(argv=None):
             return 2
         version = getattr(pymycobot, '__version__', 'desconocida')
         brazo = MyCobot(a.puerto, a.baudios)
+    try:
+        import yaml
+        version_yaml = getattr(yaml, '__version__', 'desconocida')
+    except ImportError:
+        version_yaml = 'AUSENTE (las configuraciones .yaml de la estación no se podrán cargar; .json sí)'
     estado, lat, fallos = leer(brazo, a.lecturas)
     checks = evaluar(estado['angulos'], estado['coords'], estado['pinza'], estado['encendido'],
                      estado['en_movimiento'], fallos)
@@ -125,6 +130,7 @@ def main(argv=None):
     ahora = datetime.now()
     lineas = [f'=== Diagnóstico JetCobot (solo lectura) {ahora.isoformat(timespec="seconds")} ===',
               f'host={platform.node()} python={platform.python_version()} pymycobot={version} puerto={a.puerto}',
+              f'pyyaml={version_yaml}',
               f"ángulos [°]: {estado['angulos']}", f"coordenadas [mm, °]: {estado['coords']}",
               f"pinza: {estado['pinza']}  servos: {estado['encendido']}  en movimiento: {estado['en_movimiento']}"]
     lineas.append('latencia de lectura (get_coords): ' + (

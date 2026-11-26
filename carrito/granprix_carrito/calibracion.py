@@ -11,8 +11,9 @@ La fórmula es la del HTML (filtro exponencial, alpha = 0.35 de referencia) y vi
 - las escalas de distancia y de giro dependen de la velocidad (RC-1 midió un giro de 7 a 11 % de más
   según ω): una observación hecha con otra v u otra ω que la de referencia NO se mezcla;
 - congelar las escalas (3.5.4: fijar parámetros antes de la tanda) sin perder el registro;
-- guardar y cargar un archivo JSON que lleva el identificador del robot y NO se aplica a otro robot
-  (1.1.4); la carga falla cerrada ante cualquier valor dudoso;
+- guardar y cargar un archivo YAML (`carrito/config/calibracion.yaml` es la semilla) que lleva el
+  identificador del robot y NO se aplica a otro robot (1.1.4); la carga falla cerrada ante cualquier
+  valor dudoso, clave desconocida o clave duplicada;
 - criterio de convergencia y evaluación de la reducción del error antes/después (≥ 70 % de paradas).
 
 Python puro, sin ROS. Todo umbral que no viene del HTML o del reto es nuestro y provisional.
@@ -21,13 +22,13 @@ from __future__ import annotations
 
 import csv
 import dataclasses
-import json
 import math
 import os
 import tempfile
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
 
+from comun import yaml_estricto as ye
 from geometria_dock.transformaciones import Pose2D
 
 from .planificador import LIMITES_ESCALA, Comando, Escalas, actualizar_escalas, medir_tramo
@@ -181,18 +182,23 @@ class EstimadorEscalas:
 
     # ------------------------------------------------------------------ persistencia
     def a_dict(self) -> dict:
-        return {'version': VERSION_ARCHIVO, 'robot': self._robot, 'cd': self._esc.cd, 'ca': self._esc.ca,
-                'alpha': self._alpha, 'v_ref': self._v_ref, 'w_ref': self._w_ref,
+        return {'version': VERSION_ARCHIVO, 'robot': self._robot,
+                'escalas': {'cd': self._esc.cd, 'ca': self._esc.ca},
+                'perfil': {'v_ref': self._v_ref, 'w_ref': self._w_ref},
+                'estimador': {'alpha': self._alpha, 'proteger': self._proteger, 'ventana': self._ventana,
+                              'tol_convergencia': self._tol},
                 'observaciones': len(self._reg)}
 
     def guardar(self, ruta: str) -> None:
-        """Escritura atómica: un corte a medias no deja un archivo corrupto."""
-        datos = json.dumps(self.a_dict(), indent=2, sort_keys=True)
+        """Escritura atómica: un corte a medias no deja un archivo corrupto. No usar la ruta de la semilla
+        (`carrito/config/calibracion.yaml`): se guardaría encima de ella perdiendo los comentarios."""
+        datos = ye.volcar(self.a_dict(), 'Estado del estimador de escalas, generado por EstimadorEscalas.guardar.\n'
+                                         'No editar a mano: la semilla editable es carrito/config/calibracion.yaml.')
         carpeta = os.path.dirname(os.path.abspath(ruta))
         fd, tmp = tempfile.mkstemp(dir=carpeta, prefix='.calibracion_', suffix='.tmp')
         try:
             with os.fdopen(fd, 'w', encoding='utf-8') as f:
-                f.write(datos + '\n')
+                f.write(datos)
             os.replace(tmp, ruta)
         except BaseException:
             if os.path.exists(tmp):
@@ -200,30 +206,35 @@ class EstimadorEscalas:
             raise
 
     @classmethod
-    def cargar(cls, ruta: str, robot_esperado: Optional[str] = None, **kwargs) -> 'EstimadorEscalas':
-        """Falla (ValueError) ante archivo ilegible, versión desconocida, valores no finitos o fuera de
-        límites, o si `robot_esperado` no coincide con el robot del archivo."""
-        try:
-            with open(ruta, encoding='utf-8') as f:
-                d = json.load(f)
-        except (OSError, ValueError) as e:
-            raise ValueError(f'calibración ilegible: {e}') from e
-        if not isinstance(d, dict) or d.get('version') != VERSION_ARCHIVO:
+    def cargar(cls, ruta: str, robot_esperado: Optional[str] = None) -> 'EstimadorEscalas':
+        """Falla (ValueError) ante archivo ilegible, YAML inválido, claves desconocidas o duplicadas, versión
+        desconocida, valores no finitos o fuera de límites, o si `robot_esperado` no coincide con el robot
+        del archivo."""
+        d = ye.cargar_mapeo(ruta)
+        ye.exigir_claves(d, 'calibracion', ('version', 'robot', 'escalas', 'perfil', 'estimador'),
+                         ('observaciones',))
+        if d['version'] != VERSION_ARCHIVO or isinstance(d['version'], bool):
             raise ValueError('versión de calibración desconocida')
-        cd, ca = d.get('cd'), d.get('ca')
-        if isinstance(cd, bool) or isinstance(ca, bool) or not _finitos(cd, ca):
-            raise ValueError('cd y ca deben ser números finitos')
+        robot = ye.texto(d, 'robot', 'calibracion', permitir_none=True)
+        if robot_esperado is not None and robot != robot_esperado:
+            raise ValueError(f'la calibración es del robot {robot!r}, no de {robot_esperado!r}')
+        esc = ye.seccion(d, 'escalas', 'calibracion')
+        ye.exigir_claves(esc, 'calibracion.escalas', ('cd', 'ca'))
         lo, hi = LIMITES_ESCALA
-        if not (lo <= cd <= hi and lo <= ca <= hi):
-            raise ValueError(f'cd y ca deben estar en [{lo}, {hi}]')
-        if robot_esperado is not None and d.get('robot') != robot_esperado:
-            raise ValueError(f"la calibración es del robot {d.get('robot')!r}, no de {robot_esperado!r}")
-        alpha = d.get('alpha', ALPHA_REF)
-        for nombre in ('v_ref', 'w_ref'):
-            if d.get(nombre) is not None and (isinstance(d[nombre], bool) or not _finitos(d[nombre])):
-                raise ValueError(f'{nombre} inválido')
-        return cls(Escalas(cd, ca), alpha, robot=d.get('robot'), v_ref=d.get('v_ref'), w_ref=d.get('w_ref'),
-                   **kwargs)
+        cd = ye.numero(esc, 'cd', 'calibracion.escalas', lo, hi)
+        ca = ye.numero(esc, 'ca', 'calibracion.escalas', lo, hi)
+        per = ye.seccion(d, 'perfil', 'calibracion')
+        ye.exigir_claves(per, 'calibracion.perfil', ('v_ref', 'w_ref'))
+        v_ref = ye.numero(per, 'v_ref', 'calibracion.perfil', 0, exclusivo_min=True, permitir_none=True)
+        w_ref = ye.numero(per, 'w_ref', 'calibracion.perfil', 0, exclusivo_min=True, permitir_none=True)
+        est = ye.seccion(d, 'estimador', 'calibracion')
+        ye.exigir_claves(est, 'calibracion.estimador', ('alpha', 'proteger', 'ventana', 'tol_convergencia'))
+        alpha = ye.numero(est, 'alpha', 'calibracion.estimador', 0, 1, exclusivo_min=True)
+        proteger = ye.booleano(est, 'proteger', 'calibracion.estimador')
+        ventana = ye.entero(est, 'ventana', 'calibracion.estimador', 2, 100)
+        tol = ye.numero(est, 'tol_convergencia', 'calibracion.estimador', 0, 1, exclusivo_min=True)
+        return cls(Escalas(cd, ca), alpha, proteger=proteger, robot=robot, v_ref=v_ref, w_ref=w_ref,
+                   ventana=ventana, tol_convergencia=tol)
 
     def exportar_csv(self, ruta: str) -> None:
         """Un renglón por observación, para las gráficas y la evidencia del informe."""

@@ -3,7 +3,8 @@
 Las poses son de la forma [x, y, z, rx, ry, rz] en mm y grados (convención de pymycobot). Se
 ENSEÑAN con el carrito en su pose nominal; la estrategia solo suma la compensación de la cuna.
 No hay valores por defecto: sin configuración, la estrategia devuelve NO_CONFIGURADO.
-Este módulo no inventa coordenadas: la plantilla `estacion/config/poses.plantilla.json` trae `null`.
+Este módulo no inventa coordenadas: la plantilla `estacion/config/poses.plantilla.yaml` trae `null`.
+Se lee .yaml (con PyYAML, claves duplicadas rechazadas) o .json (solo biblioteca estándar).
 """
 from __future__ import annotations
 
@@ -84,5 +85,16 @@ def desde_dict(datos: Dict[str, object]) -> PosesRol:
 
 
 def cargar(ruta: str) -> PosesRol:
-    with open(ruta, encoding='utf-8') as f:
-        return desde_dict(json.load(f))
+    """.json con la biblioteca estándar; .yaml/.yml con el cargador estricto (necesita PyYAML)."""
+    if ruta.lower().endswith('.json'):
+        try:
+            with open(ruta, encoding='utf-8') as f:
+                return desde_dict(json.load(f))
+        except (OSError, ValueError) as e:
+            raise ErrorConfiguracion(f'no se pudo leer {ruta}: {e}') from e
+    from comun import yaml_estricto as ye
+    try:
+        datos = ye.cargar_mapeo(ruta)
+    except ye.ErrorYaml as e:
+        raise ErrorConfiguracion(str(e)) from e
+    return desde_dict(datos)

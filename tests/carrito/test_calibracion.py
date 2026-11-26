@@ -1,5 +1,4 @@
 import csv
-import json
 import math
 import os
 import sys
@@ -190,48 +189,84 @@ class TestPerfilYCongelado(unittest.TestCase):
                 EstimadorEscalas(**kw)
 
 
+VALIDO = """version: 1
+robot: eq08-roscar
+escalas: {cd: 1.02, ca: 1.09}
+perfil: {v_ref: 0.1, w_ref: 0.5}
+estimador: {alpha: 0.35, proteger: true, ventana: 4, tol_convergencia: 0.01}
+"""
+
+
 class TestPersistencia(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
-        self.ruta = os.path.join(self.dir.name, 'calibracion.json')
+        self.ruta = os.path.join(self.dir.name, 'calibracion.yaml')
 
     def tearDown(self):
         self.dir.cleanup()
 
+    def escribir(self, texto):
+        with open(self.ruta, 'w', encoding='utf-8') as f:
+            f.write(texto)
+
     def test_ida_y_vuelta(self):
-        e = EstimadorEscalas(robot='g8-roscar', alpha=0.2)
+        e = EstimadorEscalas(robot='eq08-roscar', alpha=0.2, ventana=5, tol_convergencia=0.02, proteger=False)
         circuito(e, 1.02, 1.09, n=12)
         e.guardar(self.ruta)
-        c = EstimadorEscalas.cargar(self.ruta, robot_esperado='g8-roscar')
+        c = EstimadorEscalas.cargar(self.ruta, robot_esperado='eq08-roscar')
         self.assertEqual(c.escalas, e.escalas)
-        self.assertEqual((c.alpha, c.robot, c.perfil), (0.2, 'g8-roscar', e.perfil))
-        self.assertEqual(os.listdir(self.dir.name), ['calibracion.json'])   # sin temporales
+        self.assertEqual((c.alpha, c.robot, c.perfil), (0.2, 'eq08-roscar', e.perfil))
+        self.assertEqual(c.a_dict()['estimador'], e.a_dict()['estimador'])
+        self.assertEqual(os.listdir(self.dir.name), ['calibracion.yaml'])   # sin temporales
+
+    def test_lee_un_yaml_escrito_a_mano(self):
+        self.escribir(VALIDO)
+        e = EstimadorEscalas.cargar(self.ruta, robot_esperado='eq08-roscar')
+        self.assertEqual((e.escalas.cd, e.escalas.ca, e.perfil), (1.02, 1.09, (0.1, 0.5)))
 
     def test_no_se_aplica_a_otro_robot(self):
-        EstimadorEscalas(robot='g8-roscar').guardar(self.ruta)
+        EstimadorEscalas(robot='eq08-roscar').guardar(self.ruta)
         with self.assertRaises(ValueError):
             EstimadorEscalas.cargar(self.ruta, robot_esperado='otro-robot')
-        sin_id = os.path.join(self.dir.name, 'sin_id.json')
+        sin_id = os.path.join(self.dir.name, 'sin_id.yaml')
         EstimadorEscalas().guardar(sin_id)
         with self.assertRaises(ValueError):
-            EstimadorEscalas.cargar(sin_id, robot_esperado='g8-roscar')
+            EstimadorEscalas.cargar(sin_id, robot_esperado='eq08-roscar')
 
     def test_archivos_dudosos_fallan_cerrado(self):
-        malos = [{'version': 1, 'cd': -1, 'ca': 1}, {'version': 1, 'cd': 1, 'ca': float('nan')},
-                 {'version': 1, 'cd': 1, 'ca': 5.0}, {'version': 1, 'cd': True, 'ca': 1},
-                 {'version': 1, 'cd': '1.0', 'ca': 1}, {'version': 2, 'cd': 1, 'ca': 1},
-                 {'version': 1, 'cd': 1, 'ca': 1, 'w_ref': True}, [1, 2]]
-        for d in malos:
-            with open(self.ruta, 'w') as f:
-                json.dump(d, f)
-            with self.assertRaises(ValueError, msg=str(d)):
+        """Cada caso cambia UNA sola cosa del archivo válido, para que falle por esa razón."""
+        cambios = {
+            'cd negativo': ('cd: 1.02', 'cd: -1.0'), 'ca fuera de límites': ('ca: 1.09', 'ca: 5.0'),
+            'cd no numérico': ('cd: 1.02', 'cd: "1.02"'), 'cd booleano': ('cd: 1.02', 'cd: true'),
+            'cd nan': ('cd: 1.02', 'cd: .nan'), 'versión 2': ('version: 1', 'version: 2'),
+            'versión booleana': ('version: 1', 'version: true'),
+            'alpha cero': ('alpha: 0.35', 'alpha: 0'), 'alpha mayor que 1': ('alpha: 0.35', 'alpha: 1.5'),
+            'proteger como texto': ('proteger: true', 'proteger: "si"'),
+            'ventana 1': ('ventana: 4', 'ventana: 1'), 'ventana decimal': ('ventana: 4', 'ventana: 4.5'),
+            'w_ref booleano': ('w_ref: 0.5', 'w_ref: true'), 'w_ref negativa': ('w_ref: 0.5', 'w_ref: -0.5'),
+            'robot vacío': ('robot: eq08-roscar', 'robot: ""'),
+            'clave desconocida': ('version: 1', 'version: 1\nvelocidad_turbo: 3'),
+            'clave duplicada': ('version: 1', 'version: 1\nrobot: otro'),
+            'falta perfil': ('perfil: {v_ref: 0.1, w_ref: 0.5}\n', ''),
+        }
+        for nombre, (a, b) in cambios.items():
+            self.assertIn(a, VALIDO, nombre)
+            self.escribir(VALIDO.replace(a, b, 1))
+            with self.assertRaises(ValueError, msg=nombre):
                 EstimadorEscalas.cargar(self.ruta)
-        with open(self.ruta, 'w') as f:
-            f.write('{no es json')
+        for malo in ('- 1\n- 2\n', 'version: [', '', 'solo texto'):
+            self.escribir(malo)
+            with self.assertRaises(ValueError, msg=repr(malo)):
+                EstimadorEscalas.cargar(self.ruta)
         with self.assertRaises(ValueError):
-            EstimadorEscalas.cargar(self.ruta)
-        with self.assertRaises(ValueError):
-            EstimadorEscalas.cargar(os.path.join(self.dir.name, 'no_existe.json'))
+            EstimadorEscalas.cargar(os.path.join(self.dir.name, 'no_existe.yaml'))
+
+    def test_el_estado_guardado_es_yaml_legible_y_sin_secretos(self):
+        EstimadorEscalas(robot='eq08-roscar').guardar(self.ruta)
+        with open(self.ruta, encoding='utf-8') as f:
+            texto = f.read()
+        self.assertTrue(texto.startswith('# Estado del estimador'))
+        self.assertIn('escalas:', texto)
 
     def test_exporta_csv(self):
         e = EstimadorEscalas()

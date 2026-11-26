@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Ejecuta las pruebas de software del repositorio (no mueven ningún robot ni abren la red).
 # Las pruebas del contrato necesitan pydantic (pip install pydantic); si falta, se omiten.
+# Las de configuración YAML necesitan PyYAML (pip install pyyaml).
 set -u
 cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 1
 rc=0
-for d in tests/roscar_v01 tests/integracion tests/geometria_dock tests/estacion tests/jetcobot_v01 tests/carrito; do
+for d in tests/roscar_v01 tests/integracion tests/geometria_dock tests/estacion tests/jetcobot_v01 tests/carrito tests/comun; do
   [ -d "$d" ] || continue
   echo "=== $d"
   python3 -m unittest discover -s "$d" -v 2>&1 | tail -n 6

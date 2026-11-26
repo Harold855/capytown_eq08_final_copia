@@ -13,6 +13,7 @@ printf 'ROS_DISTRO=%s\nROS_DOMAIN_ID=%s\nROS_LOCALHOST_ONLY=%s\n' "${ROS_DISTRO:
 [[ "${ROS_DOMAIN_ID:-}" == 8 ]] || echo 'AVISO: ROS_DOMAIN_ID no es 8 (valor del GranPrix para eq08)'
 [[ "${ROS_LOCALHOST_ONLY:-}" == 1 ]] || echo 'AVISO: ROS_LOCALHOST_ONLY no es 1 (valor del GranPrix)'
 run python3 --version
+python3 -c 'import yaml; print("PyYAML", yaml.__version__)' 2>/dev/null || echo 'AVISO: este python3 no tiene PyYAML: las configuraciones YAML del carrito no se podrán cargar aquí (pip install pyyaml o apt install python3-yaml)'
 if command -v docker >/dev/null; then run docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'; fi
 run df -h .
 run bash -c 'ls -l /dev/video* /dev/ttyUSB* /dev/ttyACM* 2>/dev/null || true'

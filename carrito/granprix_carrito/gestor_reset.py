@@ -28,6 +28,11 @@ def dth_de_cuaternion(x: float, y: float, z: float, w: float) -> float:
     return math.degrees(math.atan2(2 * (x * z + w * y), 1 - 2 * (x * x + y * y)))
 
 
+def cuaternion_de_dth(dth_deg: float) -> Tuple[float, float, float, float]:
+    mitad = math.radians(dth_deg) / 2
+    return 0.0, math.sin(mitad), 0.0, math.cos(mitad)
+
+
 def cuaternion_de_yaw(th: float) -> Tuple[float, float, float, float]:
     return 0.0, 0.0, math.sin(th / 2), math.cos(th / 2)
 

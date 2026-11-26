@@ -10,7 +10,7 @@ sys.path.insert(0, str(RAIZ))
 sys.path.insert(0, str(RAIZ / 'tests' / 'carrito'))
 try:
     import numpy as np
-    from carrito.granprix_carrito import marcos as mc
+    from carrito.granprix_carrito import transformacion_camara_dock as mc
     from carrito.granprix_carrito.reset_pose import ResetPose
     from escena_dock import tag_visto
     from geometria_dock.transformaciones import Pose2D, componer, desde_grados

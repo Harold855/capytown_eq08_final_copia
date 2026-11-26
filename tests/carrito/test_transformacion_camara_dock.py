@@ -8,7 +8,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(RAIZ))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from carrito.granprix_carrito import marcos as mc
+from carrito.granprix_carrito import transformacion_camara_dock as mc
 from carrito.granprix_carrito.docks import DOCKS_HTML as D
 from carrito.granprix_carrito.docks import mapa_a_dock
 from comun.yaml_estricto import ErrorYaml

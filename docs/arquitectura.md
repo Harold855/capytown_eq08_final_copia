@@ -40,7 +40,7 @@ Entre máquinas solo hay MQTT, HTTP y SSH. ROS 2 vive dentro del Pi5. `twist_mux
 | Nodo del curso | Dueño | Nuestra pieza | Estado |
 |---|---|---|---|
 | `control_odometria` | Equipo | `carrito/granprix_carrito/`: `planificador`, `ejecutor`, `calibracion` | Lógica **simulada**. No es un nodo ROS aún |
-| `camara_apriltag` | Equipo (base del curso) | `vision/` (medición, calibración, corrector de distorsión) | Medición (`vision/medicion.py`, `scripts/camara/medir_tag.py`), calibración y corrección de distorsión **simuladas**. Falta el nodo y `/tag/pose` |
+| `camara_apriltag` | Equipo (base del curso) | `vision/` (medición, calibración, corrector de distorsión) | Medición (`vision/medicion.py`, `scripts/camara/medir_tag.py`), calibración y corrección de distorsión **simuladas**. El nodo `nodos/camara_apriltag_node.py` está escrito (solo probado contra un sustituto de `rclpy`) |
 | `maquina_pit` | Equipo | usa `planificar_acople`, `acople_valido`, `EstimadorEscalas`, `evaluar_reduccion` | **Pendiente** la máquina de estados |
 | `puente_mqtt`, `vigilante_red`, `tablero_web`, `grabador` | Curso | `integracion/` solo describe la conexión y los tópicos | Sin verificar con un broker real |
 | `placa_micro_ros` | Yahboom | `scripts/roscar_v01/` la diagnostica (solo lectura) | Sin verificar en el robot |
@@ -66,11 +66,13 @@ carrito.granprix_carrito
   ejecutor         -> planificador
   calibracion      -> planificador, comun, geometria_dock
   configuracion    -> calibracion, ejecutor, planificador, comun
-  marcos           -> docks, comun, geometria_dock       (cámara -> dock; cargar_marcos)
+  transformacion_camara_dock -> docks, comun, geometria_dock     (cámara -> dock; cargar_marcos)
   reset_pose       -> geometria_dock                     (map -> odom)
-  pose_dock        -> docks, marcos, planificador, reset_pose, geometria_dock   (PoseDock, LocalizadorDock)
+  pose_dock        -> docks, transformacion_camara_dock, planificador, reset_pose, geometria_dock   (PoseDock, LocalizadorDock)
   gestor_reset     -> pose_dock, reset_pose, geometria_dock                     (odometría en el tiempo, tag fresco)
-  nodos/nodo_reset_pose -> gestor_reset, marcos, pose_dock, reset_pose          (rclpy; único módulo que importa ROS)
+  nodos/nodo_reset_pose -> gestor_reset, transformacion_camara_dock, pose_dock, reset_pose          (rclpy)
+  nodos/tag_emulado     -> gestor_reset, transformacion_camara_dock, docks                         (rclpy solo dentro de _clase_nodo)
+  nodos/camara_apriltag_node -> gestor_reset, vision.medicion                                      (rclpy solo dentro de _clase_nodo)
 
 app_equipo (estacion/src)
   puerto           (sin dependencias)
@@ -124,7 +126,7 @@ Orden del curso: medir → acoplar → solicitar → esperar resultado → medir
 
 | Paso | Función existente | Falta |
 |---|---|---|
-| medir la pose | `vision.medicion.CamaraTag.medir` y `agregar` (o `scripts/camara/medir_tag.py`), y `marcos.desde_medicion` (o `pose_dock.py`) | nodo de cámara y `/tag/pose`; montaje medido; marco del dock del docente |
+| medir la pose | `vision.medicion.CamaraTag.medir` y `agregar` (o `scripts/camara/medir_tag.py`), y `transformacion_camara_dock.desde_medicion` (o `pose_dock.py`) | probar `nodos/camara_apriltag_node.py` (o `tag_emulado.py` en el simulador); montaje medido; marco del dock del docente |
 | ¿está dentro de tolerancia? | `acople_valido`, `error_acople` | — |
 | corregir | `planificar_acople` + `EjecutorMovimiento` | orquestarlo con reintentos |
 | solicitud / resultado | constructores de `scripts/roscar_v01/mensajes_contrato.py`, tópicos de `mqtt.yaml` | publicarlos vía `puente_mqtt` |
@@ -135,7 +137,7 @@ El estimador necesita la pose medida **antes** de cualquier acople, y el comando
 
 ## 7. Adaptadores pendientes (aquí se conecta lo demás)
 1. **Ejecutor → ROS 2:** una `Salida` que publique `Twist` en la entrada autorizada de `twist_mux`, un `odom_ok()` basado en `/odom`, un temporizador a 20 Hz que llame a `paso()`, y comprobar el *timeout* de `twist_mux`.
-2. **Cámara → ROS 2:** un nodo que use `CamaraTag` (corrige la distorsión, filtra por calidad y agrega cuadros) y publique `/tag/pose`.
+2. **Cámara → ROS 2:** `carrito/nodos/camara_apriltag_node.py` (usa `CamaraTag`: corrige la distorsión, filtra por calidad y publica `/tag/pose`) está escrito pero **solo probado contra un sustituto de `rclpy`**; para el simulador RC-1, `tag_emulado.py` publica la misma medición emulada a partir de `/sim/pose`.
 3. **Pit → MQTT:** publicar `solicitud` y `evento` y leer `resultado` y `turno` con los tópicos de `mqtt.yaml`, a través de `puente_mqtt` (del curso).
 4. **Brazo:** implementar `BrazoJetCobot` según la firma que publique el docente y ajustar `puerto.py`.
 5. **TF `map → odom`:** escrito (`carrito/nodos/nodo_reset_pose.py`, sobre `gestor_reset.py`) pero **solo probado contra un sustituto de `rclpy`**; falta comprobarlo con ROS real (ver `marcos_y_reset_pose.md`).

@@ -2,7 +2,7 @@
 
 **Proyecto final de Robótica – CapyTown**
 
-> **Estado (26-nov-2026):** hay lógica en Python y 461 pruebas automáticas sin robot. **Nada se ha ejecutado todavía contra el ROSCar, un JetCobot, una cámara real, ROS 2 ni un broker real.** Detalle en [`docs/desarrollo_realizado.md`](docs/desarrollo_realizado.md).
+> **Estado (26-nov-2026):** hay lógica en Python y 497 pruebas automáticas sin robot. **Nada se ha ejecutado todavía contra el ROSCar, un JetCobot, una cámara real, ROS 2 ni un broker real.** Detalle en [`docs/desarrollo_realizado.md`](docs/desarrollo_realizado.md).
 > **Precedencia de fuentes:** (1) lo que el docente indique por escrito; (2) su repositorio [`codeplai/GranPrix`](https://github.com/codeplai/GranPrix); (3) el HTML oficial.
 
 ## Equipo
@@ -95,14 +95,15 @@ Bono: +1 por odometría visual documentada (sin pasar de 20). Rige la rúbrica d
 | Visión: medición del AprilTag y calibración de la cámara | Hechas con una cámara sintética |
 | Conversión cámara → dock y reset de pose | Hechos en Python puro; simulados (falta medir el montaje de la cámara) |
 | Nodo ROS 2 del reset de pose (TF `map → odom`) | Escrito; **probado solo contra un sustituto de `rclpy`** |
-| Nodo de cámara, máquina de estados del pit y tablero web | **Pendientes** |
+| Nodo de cámara (`camara_apriltag_node.py`) y emulador del tag para el simulador RC-1 (`tag_emulado.py`) | Escritos; **probados solo contra un sustituto de `rclpy`** |
+| Máquina de estados del pit y tablero web | **Pendientes** |
 | Pruebas con los robots reales | **Ninguna todavía** |
 
 ## Cómo empezar
 
 ```bash
 bash scripts/preparar_entorno.sh --vision   # entorno virtual y dependencias
-bash scripts/ejecutar_pruebas.sh            # 461 pruebas; "TODO OK" si pasan
+bash scripts/ejecutar_pruebas.sh            # 497 pruebas; "TODO OK" si pasan
 ```
 
 Detalle del entorno en [`docs/entorno_desarrollo.md`](docs/entorno_desarrollo.md).
@@ -114,7 +115,7 @@ Detalle del entorno en [`docs/entorno_desarrollo.md`](docs/entorno_desarrollo.md
 - `vision/`: medición del AprilTag y calibración de la cámara. `integracion/`: configuración MQTT. `comun/`, `geometria_dock/`: utilidades compartidas.
 - `simulacion/`: modelo del simulador del HTML, barridos de parámetros e imágenes sintéticas.
 - `scripts/`: entorno, pruebas, diagnósticos (ROSCar, JetCobot), calibración de cámara y copias históricas de RC-0 y RC-1.
-- `tests/`: 461 pruebas propias. `experimentos/`: pruebas de laboratorio, separadas de la evidencia oficial.
+- `tests/`: 497 pruebas propias. `experimentos/`: pruebas de laboratorio, separadas de la evidencia oficial.
 - `vendor/granprix/`: copia fija del repositorio del docente, **sin modificar**.
 - `docs/`: documentación; el índice está en [`docs/README.md`](docs/README.md).
 

@@ -7,7 +7,7 @@ RAIZ = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(RAIZ))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from carrito.granprix_carrito import gestor_reset as gr
-from carrito.granprix_carrito import marcos as mc
+from carrito.granprix_carrito import transformacion_camara_dock as mc
 from carrito.granprix_carrito.docks import DOCKS_HTML as D
 from carrito.granprix_carrito.gestor_reset import GestorReset
 from carrito.granprix_carrito.pose_dock import LocalizadorDock
@@ -59,6 +59,10 @@ class TestCuaterniones(unittest.TestCase):
                 *_, R = tag_visto(dock, CAM, TAG, incl, h_tag=0.14)
                 esperado = math.degrees(math.atan2(R[0][2], R[2][2]))
                 self.assertAlmostEqual(gr.dth_de_cuaternion(*cuaternion_de_matriz(R)), esperado, places=7)
+
+    def test_cuaternion_de_dth_ida_y_vuelta(self):
+        for dth in (-40.0, -3.0, 0.0, 2.5, 45.0):
+            self.assertAlmostEqual(gr.dth_de_cuaternion(*gr.cuaternion_de_dth(dth)), dth, places=9)
 
     def test_rechaza_cuaterniones_no_validos(self):
         for q in ((0, 0, 0, 0), (0, 0, 0, 2), (float('nan'), 0, 0, 1)):

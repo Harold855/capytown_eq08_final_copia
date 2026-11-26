@@ -5,7 +5,7 @@ Seis archivos de configuración, todos con el mismo cargador estricto (`comun/ya
 | Archivo | Lo lee | Qué fija | Estado de los valores |
 |---|---|---|---|
 | `carrito/config/movimiento.yaml` | `carrito.granprix_carrito.configuracion.cargar_movimiento` | velocidades de referencia y límites, parámetros del ejecutor | límites = reto; referencias = HTML/RC-1; `pausa_s` y `asentamiento_s` = **placeholders a medir** |
-| `carrito/config/marcos.yaml` | `carrito.granprix_carrito.marcos.cargar_marcos` | montaje de la cámara en el robot, posición del tag en el dock, umbrales de "cerca del dock" | **`null`: se miden en el laboratorio**; la carga falla hasta entonces |
+| `carrito/config/marcos.yaml` | `carrito.granprix_carrito.transformacion_camara_dock.cargar_marcos` | montaje de la cámara en el robot, posición del tag en el dock, umbrales de "cerca del dock" | **`null`: se miden en el laboratorio**; la carga falla hasta entonces |
 | `carrito/config/calibracion.yaml` | `EstimadorEscalas.cargar` / `cargar_carrito` | robot, escalas `cd`/`ca` iniciales, perfil `v`/`ω`, parámetros del estimador | escalas **1.0 = sin caracterizar**; `alpha` 0.35 = referencia del HTML |
 | `estacion/config/estacion.yaml` | `app_equipo.configuracion.cargar_estacion` | tolerancias, tope de tiempo, geometría del montaje | tolerancias = reto; geometría = **supuestos** hasta medir |
 | `estacion/config/poses.plantilla.yaml` | `app_equipo.posiciones.cargar` (copia `poses_rolN.yaml`) | las 8 poses de trabajo de un rol | todo `null`: **se enseñan en el laboratorio** |

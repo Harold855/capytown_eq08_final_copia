@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from carrito.granprix_carrito import marcos as mc  # noqa: E402
+from carrito.granprix_carrito import transformacion_camara_dock as mc  # noqa: E402
 from comun.yaml_estricto import ErrorYaml  # noqa: E402
 from geometria_dock.transformaciones import desde_grados  # noqa: E402
 

@@ -8,7 +8,7 @@ sys.path.insert(0, str(RAIZ))
 sys.path.insert(0, str(RAIZ / 'scripts' / 'roscar_v01'))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import mensajes_contrato as mcon
-from carrito.granprix_carrito import marcos as mc
+from carrito.granprix_carrito import transformacion_camara_dock as mc
 from carrito.granprix_carrito.docks import DOCKS_HTML as D
 from carrito.granprix_carrito.pose_dock import LocalizadorDock, PoseDock
 from carrito.granprix_carrito.reset_pose import ResetPose

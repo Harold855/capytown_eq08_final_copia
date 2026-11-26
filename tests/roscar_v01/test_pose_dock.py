@@ -111,7 +111,7 @@ class TestMontaje(Base):
         nuevo = nuevo.replace('x_m: null\n  y_m: null\n  yaw_deg: 0.0', '\n  '.join(bloque(tag)), 1)
         ruta = Path(self.dir.name) / 'completo.yaml'
         ruta.write_text(nuevo, encoding='utf-8')
-        from carrito.granprix_carrito import marcos as mc
+        from carrito.granprix_carrito import transformacion_camara_dock as mc
         m = mc.cargar_marcos(str(ruta))
         self.assertAlmostEqual(m.montaje.pose.x, 0.10, places=3)
 

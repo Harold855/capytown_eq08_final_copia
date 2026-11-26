@@ -7,7 +7,7 @@ from typing import Dict, Optional, Tuple
 from geometria_dock.transformaciones import Pose2D
 
 from .docks import DOCKS_HTML, Dock, mapa_a_dock
-from .marcos import Marcos, desde_medicion
+from .transformacion_camara_dock import Marcos, desde_medicion
 from .planificador import acople_valido, error_acople
 from .reset_pose import ResetPose, ResultadoReset
 

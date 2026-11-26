@@ -1,6 +1,18 @@
 # Cámara → dock y reset de pose
 
-Lógica en `carrito/granprix_carrito/marcos.py` y `reset_pose.py`, configuración en `carrito/config/marcos.yaml` y script `scripts/roscar_v01/pose_dock.py`. Es Python puro y se probó **en simulación** (escena física en 3D y, aparte, imágenes renderizadas pasadas por el detector); **nunca con el robot ni con una cámara real**. Falta el adaptador ROS 2 que publique el TF `map → odom`.
+Lógica en `carrito/granprix_carrito/transformacion_camara_dock.py` y `reset_pose.py`, configuración en `carrito/config/marcos.yaml` y script `scripts/roscar_v01/pose_dock.py`. Es Python puro y se probó **en simulación** (escena física en 3D y, aparte, imágenes renderizadas pasadas por el detector); **nunca con el robot ni con una cámara real**. Falta el adaptador ROS 2 que publique el TF `map → odom`.
+
+## Archivos
+| Archivo | Función |
+|---|---|
+| `carrito/granprix_carrito/transformacion_camara_dock.py` | Convertir la medición visual a la pose del ROSCar (en el dock y en el mapa). |
+| `carrito/granprix_carrito/reset_pose.py` | Corregir la localización global (`map → odom`). |
+| `carrito/nodos/tag_emulado.py` | Emular el AprilTag con el simulador RC-1 (a partir de `/sim/pose`). |
+| `carrito/nodos/camara_apriltag_node.py` | Integrar las mediciones con ROS 2 (imagen → `/tag/pose`). |
+| `tests/carrito/test_transformacion_camara_dock.py` | Verificar signos, unidades y transformaciones. |
+| `tests/carrito/test_reset_pose.py` | Validar matemáticamente la corrección. |
+
+Además: `pose_dock.py` (`PoseDock`, `LocalizadorDock`), `gestor_reset.py` (odometría en el tiempo, tag fresco) y `nodos/nodo_reset_pose.py` (TF `map → odom` y servicio), con sus pruebas (`test_localizador_dock.py`, `test_gestor_reset.py`, `test_nodo_reset_pose.py`, `test_tag_emulado.py`, `test_camara_apriltag_node.py`, `tests/vision/test_marcos_imagen.py`) y `scripts/roscar_v01/pose_dock.py`.
 
 ## Convenciones
 - Todo en el plano, con `T_A_B` = coordenadas de B expresadas en A (`geometria_dock.transformaciones`). Robot: x adelante, y a la izquierda, ángulo antihorario.
@@ -68,7 +80,7 @@ Interfaz (los nombres son **nuestros**, provisionales hasta que el curso publiqu
 
 | Qué | Nombre por defecto | Tipo | Nota |
 |---|---|---|---|
-| entrada | `/odom` | `nav_msgs/Odometry` | marcos esperados `odom` → `base_link`; si no coinciden se descarta |
+| entrada | `/odom` | `nav_msgs/Odometry` | marcos esperados `odom` → `base_footprint` (el de RC-1 y del simulador); si no coinciden se descarta |
 | entrada | `/tag/pose` | `geometry_msgs/PoseStamped` | pose del tag en el sistema óptico de la cámara; se supone que solo llega si el tag fue aceptado y con la hora de captura |
 | entrada | `/pit/dock` | `std_msgs/Int32` | estación actual (1 a 4), la fija la máquina del pit |
 | servicio | `/reset_pose/aplicar` | `std_srvs/Trigger` | aplica el reset con el último tag; `message` trae un JSON con el motivo |
@@ -90,12 +102,36 @@ ros2 run tf2_ros tf2_echo map odom
 Los parámetros decimales se pasan con punto decimal (`-p retardo_odom_s:=0.5`, no `0`): ROS rechaza un entero para un parámetro de tipo real.
 
 **Qué hay que comprobar en el robot** (el sustituto no lo puede garantizar):
-1. Los marcos reales de `/odom` (`child_frame_id` puede ser `base_footprint`; parámetro `base_frame`).
+1. Los marcos reales de `/odom` (parámetro `base_frame`; `wheel_params_g8.yaml` de RC-1 usa `base_footprint`).
 2. Si las marcas de tiempo de `/odom` están en el mismo reloj que las del tag (el micro-ROS puede tener su propio reloj): si no, `odom_sello_llegada:=true` y `tag_sello_llegada:=true` usan la hora de llegada.
 3. El retardo real de `/odom` en este robot (`retardo_odom_s`).
 4. Que nadie más publique `map` → `odom` (`ros2 topic info /tf -v`).
-5. Que exista un nodo de cámara que publique `/tag/pose` con ese formato: **hoy no existe**. Para ensayar el nodo antes se puede publicar a mano un `PoseStamped`.
+5. Que algún nodo publique `/tag/pose` con ese formato: `camara_apriltag_node.py` (cámara real, sin verificar) o `tag_emulado.py` (simulador).
 6. Los QoS: las suscripciones usan `qos_profile_sensor_data` (aceptan publicadores confiables y *best effort*).
+
+## Emulación del tag con el simulador RC-1 (`nodos/tag_emulado.py`)
+La cámara del simulador (`yahboomcar_sim`, 160×120) ve el piso y **no dibuja AprilTags**; por eso hace falta emular la medición. El nodo toma la pose real `/sim/pose` (`PoseStamped` en `map`), calcula lo que mediría la cámara (la cadena de `transformacion_camara_dock.py` al revés), decide si el tag es visible (campo de visión, distancia 0.10–0.60 m y ángulo de visión del tag ≤ 60°), le añade ruido (σ 1 mm y 0.5° por defecto, pérdidas opcionales) y publica `/tag/pose` con la **hora de la pose** y el mismo formato que el nodo de cámara real. Opcionalmente publica `/pit/dock` (emula a la máquina del pit).
+
+- Es una **medición emulada**, no un tag real: sirve para ejercitar el reset y el flujo del pit sin cámara, no para medir la precisión de la visión (para eso, `medir_tag.py comparar`).
+- Se contrastó con la escena física 3D independiente de las pruebas (2 mm y 0.2°) y la cadena emulador → reset recupera la pose a menos de 1 cm con ruido.
+- Montaje del simulador: `carrito/config/marcos_sim.yaml` (cámara 10 cm adelante, 20.05° hacia abajo, tag a 28 cm de la cámara en el dock). **No es el del robot real.** El simulador usa el marco base `base_footprint`.
+
+Cómo ensayarlo (sin verificar: no se ejecutó con ROS ni con el simulador):
+```bash
+ros2 launch yahboomcar_sim sim.launch.py world:=<mundo> start:=2.42,0.38,0.05 noise:=none     # terminal 1
+python3 -m carrito.nodos.tag_emulado --ros-args -p marcos_yaml:=carrito/config/marcos_sim.yaml -p publicar_dock:=true   # 2
+python3 -m carrito.nodos.nodo_reset_pose --ros-args -p marcos_yaml:=carrito/config/marcos_sim.yaml                     # 3
+ros2 service call /reset_pose/aplicar std_srvs/srv/Trigger          # con el robot quieto y el tag visible
+ros2 run tf2_ros tf2_echo map odom                                   # comparar con /sim/pose y /odom
+```
+- El simulador publica su propio `map → odom` solo con `publish_map_to_odom:=true` o `odom_align` > 0 (apagados por defecto): **dejarlos apagados**, o habría dos publicadores. Con los valores por defecto el `map → odom` no existe hasta el primer reset aceptado, que es justo el caso del arranque.
+- `start:=x,y,yaw` está en el marco `map`; hay que elegir un mundo cuyo mapa contenga esa zona (el `arena_rc1` de RC-1 puede no contenerla).
+
+## Nodo de cámara (`nodos/camara_apriltag_node.py`)
+Suscribe una imagen (`sensor_msgs/Image`; `mono8`, `rgb8` o `bgr8`, convertida **sin `cv_bridge`**), la mide con `CamaraTag` (corrige la distorsión, rechaza detecciones dudosas, filtra con mediana móvil) y publica `/tag/pose` con la hora de captura de la imagen. Parámetros: `camara_yaml` (obligatorio; con la calibración de damero también `tamano_mm`), `tag_id` (0 = cualquiera), `image_topic`, `margen_min`, `hamming_max`, `ventana`. Publica `/camara_apriltag/estado` con un contador por motivo de rechazo.
+- El `PoseStamped` lleva **solo el giro vertical** (`dth`) como cuaternión: es lo único que entrega el detector de forma fiable y lo único que consume el reset. No lleva el id del tag (la estación la da `/pit/dock`).
+- El tópico de imagen del ROSCar real **no se conoce**: el valor por defecto (`/camera/image_raw`) es el del simulador.
+- Necesita OpenCV y `pupil-apriltags` en el Pi5 (no verificado) y la calibración de la cámara real; el simulador no sirve para probarlo porque no dibuja tags.
 
 ## Resultados en simulación
 - Escena física en 3D (cámara con montaje e inclinación, tag con altura distinta): la conversión recupera la pose a 2 mm y 0.2° en la zona de acople (±4 cm y ±6°), y a 1e-9 sin inclinación.
@@ -105,6 +141,6 @@ Los parámetros decimales se pasan con punto decimal (`-p retardo_odom_s:=0.5`, 
 
 ## Lo que falta
 1. Medir el montaje y la posición del tag (arriba). Sin esto no hay pose en el dock.
-2. Probar el adaptador ROS 2 con ROS real (ver su sección) y escribir el nodo de cámara que publique `/tag/pose`.
+2. Probar con ROS real los tres nodos (`nodo_reset_pose.py`, `tag_emulado.py`, `camara_apriltag_node.py`); todos están probados solo contra un sustituto de `rclpy`.
 3. Decidir con el docente el marco del dock y si el reset debe ocurrir antes o después de la segunda medición del pit (README de referencia §15).
 4. Con la cámara real, cuánto se aparta la medición de estas cifras (iluminación, foco, calibración).

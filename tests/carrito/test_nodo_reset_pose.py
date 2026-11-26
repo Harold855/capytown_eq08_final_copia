@@ -9,7 +9,6 @@ import json
 import math
 import sys
 import tempfile
-import types
 import unittest
 from pathlib import Path
 
@@ -22,148 +21,23 @@ from test_gestor_reset import CAM, INCL, MAP_ODOM_REAL, TAG, cuaternion_de_matri
 from carrito.granprix_carrito import gestor_reset as gr
 
 SEMILLA = RAIZ / 'carrito' / 'config' / 'marcos.yaml'
-MODULOS_FALSOS = ('rclpy', 'rclpy.node', 'rclpy.qos', 'geometry_msgs', 'geometry_msgs.msg', 'nav_msgs', 'nav_msgs.msg',
-                  'std_msgs', 'std_msgs.msg', 'std_srvs', 'std_srvs.srv', 'tf2_ros', 'carrito.nodos.nodo_reset_pose')
 
 
-class Ns:
-    def __init__(self, **kw):
-        self.__dict__.update(kw)
-
-
-def vector(*campos):
-    return Ns(**{c: 0.0 for c in campos})
-
-
-class TransformStamped:
-    def __init__(self):
-        self.header = Ns(stamp=None, frame_id='')
-        self.child_frame_id = ''
-        self.transform = Ns(translation=vector('x', 'y', 'z'), rotation=vector('x', 'y', 'z', 'w'))
-
-
-class Mensaje:
-    def __init__(self, data=None):
-        self.data = data
-
-
-class Registro:
-    def __init__(self):
-        self.info, self.advertencias = [], []
-
-    def warning(self, texto):
-        self.advertencias.append(texto)
-
-    def info_(self, texto):
-        self.info.append(texto)
-
-
-class Logger:
-    def __init__(self, reg):
-        self.reg = reg
-
-    def info(self, t):
-        self.reg.info.append(t)
-
-    def warning(self, t):
-        self.reg.advertencias.append(t)
-
-
-class Publicador:
-    def __init__(self):
-        self.enviados = []
-
-    def publish(self, m):
-        self.enviados.append(m)
-
-
-class Reloj:
-    def __init__(self, nodo):
-        self.nodo = nodo
-
-    def now(self):
-        ns = self.nodo.ns
-        return Ns(nanoseconds=ns, to_msg=lambda: Ns(sec=ns // 10 ** 9, nanosec=ns % 10 ** 9))
-
-
-class Node:
-    sobrescribe = {}
-
-    def __init__(self, nombre):
-        self.nombre, self._params, self.subs, self.servicios, self.timers, self.pubs = nombre, {}, [], [], [], []
-        self.ns, self.reg = 0, Registro()
-
-    def declare_parameter(self, n, d):
-        self._params[n] = Ns(value=Node.sobrescribe.get(n, d))
-
-    def get_parameter(self, n):
-        return self._params[n]
-
-    def create_subscription(self, tipo, topico, cb, qos):
-        self.subs.append((tipo, topico, cb))
-
-    def create_service(self, tipo, nombre, cb):
-        self.servicios.append((tipo, nombre, cb))
-
-    def create_timer(self, periodo, cb):
-        self.timers.append((periodo, cb))
-
-    def create_publisher(self, tipo, topico, qos):
-        p = Publicador()
-        self.pubs.append((tipo, topico, p))
-        return p
-
-    def get_clock(self):
-        return Reloj(self)
-
-    def get_logger(self):
-        return Logger(self.reg)
-
-    def destroy_node(self):
-        pass
-
-
-class Difusor:
-    def __init__(self, nodo):
-        self.enviados = []
-
-    def sendTransform(self, t):
-        self.enviados.append(t)
-
-
-def instalar_modulos_falsos():
-    def modulo(nombre, **atributos):
-        m = types.ModuleType(nombre)
-        m.__dict__.update(atributos)
-        sys.modules[nombre] = m
-        return m
-    modulo('rclpy', init=lambda args=None: None, spin=lambda n: None, ok=lambda: True, shutdown=lambda: None)
-    modulo('rclpy.node', Node=Node)
-    modulo('rclpy.qos', qos_profile_sensor_data='SENSOR')
-    modulo('geometry_msgs')
-    modulo('geometry_msgs.msg', PoseStamped=type('PoseStamped', (), {}), TransformStamped=TransformStamped)
-    modulo('nav_msgs')
-    modulo('nav_msgs.msg', Odometry=type('Odometry', (), {}))
-    modulo('std_msgs')
-    modulo('std_msgs.msg', Int32=type('Int32', (Mensaje,), {}), String=type('String', (Mensaje,), {}))
-    modulo('std_srvs')
-    modulo('std_srvs.srv', Trigger=type('Trigger', (), {}))
-    modulo('tf2_ros', TransformBroadcaster=Difusor)
+import ros_falso as rf
+from ros_falso import Mensaje, Node, Ns
 
 
 def setUpModule():
     global nodo_mod
-    instalar_modulos_falsos()
+    rf.instalar()
     nodo_mod = importlib.import_module('carrito.nodos.nodo_reset_pose')
 
 
 def tearDownModule():
-    for m in MODULOS_FALSOS:
-        sys.modules.pop(m, None)
-    Node.sobrescribe = {}
+    rf.desinstalar('carrito.nodos.nodo_reset_pose')
 
 
-def odom_msg(t, pose, frame='odom', hijo='base_link'):
+def odom_msg(t, pose, frame='odom', hijo='base_footprint'):
     sec, nano = int(t), int(round((t - int(t)) * 1e9))
     q = gr.cuaternion_de_yaw(pose.th)
     return Ns(header=Ns(frame_id=frame, stamp=Ns(sec=sec, nanosec=nano)), child_frame_id=hijo,
@@ -217,7 +91,7 @@ class TestArranque(Base):
         self.assertAlmostEqual(n.timers[0][0], 1 / 20)
 
     def test_los_parametros_se_pueden_cambiar(self):
-        n = self.crear(odom_topic='/odom_corregida', retardo_odom_s=0.5, base_frame='base_footprint')
+        n = self.crear(odom_topic='/odom_corregida', retardo_odom_s=0.5, base_frame='base_link')
         self.assertIn('/odom_corregida', {t for _, t, _ in n.subs})
         self.assertEqual(n.gestor._retardo, 0.5)
 
@@ -305,7 +179,7 @@ class TestFlujo(Base):
         cb = self.callback(n, '/odom')
         p = odom_de(mapa_real(2, self.ROBOT))
         cb(odom_msg(1.0, p, frame='odom_otra'))
-        cb(odom_msg(1.0, p, hijo='base_footprint'))
+        cb(odom_msg(1.0, p, hijo='base_link'))
         malo = odom_msg(1.0, p)
         malo.pose.pose.orientation = Ns(x=0.0, y=0.0, z=0.0, w=0.0)
         cb(malo)
@@ -315,8 +189,8 @@ class TestFlujo(Base):
         self.assertTrue(n.reg.advertencias)
 
     def test_con_el_marco_base_configurado(self):
-        n = self.crear(base_frame='base_footprint')
-        self.callback(n, '/odom')(odom_msg(1.0, Pose2D(0, 0, 0), hijo='base_footprint'))
+        n = self.crear(base_frame='base_link')
+        self.callback(n, '/odom')(odom_msg(1.0, Pose2D(0, 0, 0), hijo='base_link'))
         self.assertEqual(n.gestor.estado()['odom_muestras'], 1)
 
     def test_sello_de_llegada_en_lugar_del_del_mensaje(self):

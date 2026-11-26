@@ -1,5 +1,5 @@
 # Marcos para convertir la pose del tag (sistema de la cámara) a pose del robot en el dock y en el mapa.
-# Lo lee carrito/granprix_carrito/marcos.py (cargar_marcos). Mientras haya un null, la carga falla: hay que medir.
+# Lo lee carrito/granprix_carrito/transformacion_camara_dock.py (cargar_marcos). Mientras haya un null, la carga falla: hay que medir.
 # Convención: x adelante, y a la izquierda, yaw antihorario. Marco del dock (supuesto): origen en el centro del dock,
 # x en el rumbo de llegada, y a la izquierda.
 version: 1

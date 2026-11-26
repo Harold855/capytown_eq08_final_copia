@@ -16,14 +16,14 @@ from tf2_ros import TransformBroadcaster  # noqa: E402
 
 from carrito.granprix_carrito.gestor_reset import (GestorReset, cuaternion_de_yaw, dth_de_cuaternion,  # noqa: E402
                                                    yaw_de_cuaternion)
-from carrito.granprix_carrito.marcos import cargar_marcos  # noqa: E402
+from carrito.granprix_carrito.transformacion_camara_dock import cargar_marcos  # noqa: E402
 from carrito.granprix_carrito.pose_dock import LocalizadorDock  # noqa: E402
 from carrito.granprix_carrito.reset_pose import ResetPose  # noqa: E402
 from geometria_dock.transformaciones import Pose2D  # noqa: E402
 
 PARAMETROS = {
     'marcos_yaml': '', 'odom_topic': '/odom', 'tag_topic': '/tag/pose', 'dock_topic': '/pit/dock', 'map_frame': 'map',
-    'odom_frame': 'odom', 'base_frame': 'base_link', 'retardo_odom_s': 0.0, 'ventana_quieto_s': 0.3,
+    'odom_frame': 'odom', 'base_frame': 'base_footprint', 'retardo_odom_s': 0.0, 'ventana_quieto_s': 0.3,
     'edad_max_tag_s': 1.0, 'salto_max_m': 0.15, 'salto_max_deg': 20.0, 'tf_hz': 20.0, 'odom_sello_llegada': False,
     'tag_sello_llegada': False,
 }

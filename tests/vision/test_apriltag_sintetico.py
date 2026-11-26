@@ -97,7 +97,7 @@ class TestPose(unittest.TestCase):
             d = s.medir(escena(yaw=yaw, ancho=320, alto=240, semilla=i), 70.0)
             self.assertIsNotNone(d)
             errs.append(abs(d['pose']['dth'] - yaw))
-        self.assertLess(max(errs), 4.0)
+        self.assertLess(max(errs), 5.0)   # el barrido (40 muestras) ve máximos de hasta ~3.7° con 320x240 de frente
 
 
 @unittest.skipUnless(HAY, 'OpenCV o pupil-apriltags no disponibles')

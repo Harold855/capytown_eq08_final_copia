@@ -162,5 +162,77 @@ class TestArchivo(unittest.TestCase):
             cf.cargar_camara(os.path.join(self.dir.name, 'no_existe.yaml'))
 
 
+class TestArchivoDamero(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        self.ruta = os.path.join(self.dir.name, 'camara.yaml')
+        self.p = cf.ParametrosCamara(640, 480, 520.0, 520.0, 322.0, 238.0, None, None, None, None, None,
+                                     '2026-12-03T11:00:00', ('aviso',), (-0.3, 0.08, 0.0, 0.0, 0.0),
+                                     cf.DetalleDamero(9, 6, 0.025, 'simple', 0.12, 0.2, 20))
+
+    def escribir(self, texto):
+        with open(self.ruta, 'w', encoding='utf-8') as f:
+            f.write(texto)
+
+    def test_ida_y_vuelta(self):
+        cf.guardar_camara(self.ruta, self.p)
+        q = cf.cargar_camara(self.ruta)
+        self.assertEqual(q.metodo, 'damero')
+        self.assertEqual((q.fx, q.cx, q.cy, q.distorsion), (520.0, 322.0, 238.0, (-0.3, 0.08, 0.0, 0.0, 0.0)))
+        self.assertEqual(q.damero, self.p.damero)
+        self.assertIsNone(q.tamano_tag_m); self.assertIsNone(q.offset_cm)
+        self.assertEqual(q.advertencias, ('aviso',))
+        self.assertEqual(os.listdir(self.dir.name), ['camara.yaml'])
+
+    def test_sin_validacion_cruzada(self):
+        sin = cf.ParametrosCamara(*[getattr(self.p, f) for f in ('ancho', 'alto', 'fx', 'fy', 'cx', 'cy', 'tamano_tag_m',
+                                                                  'offset_cm', 'rms_cm', 'n_distancias', 'rango_cm', 'fecha',
+                                                                  'advertencias', 'distorsion')],
+                                  cf.DetalleDamero(9, 6, 0.025, 'completo', 0.3, None, 12))
+        cf.guardar_camara(self.ruta, sin)
+        self.assertIsNone(cf.cargar_camara(self.ruta).damero.rms_validacion_px)
+
+    def test_el_archivo_de_regla_sigue_funcionando_y_no_se_mezclan(self):
+        regla = cf.parametros_desde_ajuste(cf.Ajuste(F_REAL, 1.8, 0.1, 2, (0.1,), ()), ANCHO, ALTO, 0.0595, [15, 20, 25])
+        cf.guardar_camara(self.ruta, regla)
+        self.assertEqual(cf.cargar_camara(self.ruta).metodo, 'regla')
+        self.assertIsNone(cf.cargar_camara(self.ruta).distorsion)
+        with open(self.ruta, encoding='utf-8') as f:
+            base = f.read()
+        self.escribir(base + 'distorsion: {k1: 0.1, k2: 0, p1: 0, p2: 0, k3: 0}\n')
+        with self.assertRaisesRegex(ErrorYaml, 'no admite'):                      # regla + distorsión
+            cf.cargar_camara(self.ruta)
+
+    def test_damero_con_tag_o_sin_distorsion_falla(self):
+        cf.guardar_camara(self.ruta, self.p)
+        with open(self.ruta, encoding='utf-8') as f:
+            base = f.read()
+        self.escribir(base + 'tag: {tamano_m: 0.06}\n')
+        with self.assertRaisesRegex(ErrorYaml, 'no lleva'):
+            cf.cargar_camara(self.ruta)
+        sin = base[:base.index('distorsion:')] + base[base.index('ajuste:'):]
+        self.escribir(sin)
+        with self.assertRaisesRegex(ErrorYaml, 'requiere'):
+            cf.cargar_camara(self.ruta)
+
+    def test_valores_dudosos_fallan_cerrado(self):
+        cf.guardar_camara(self.ruta, self.p)
+        with open(self.ruta, encoding='utf-8') as f:
+            base = f.read()
+        cambios = {
+            'k1 absurdo': ('k1: -0.3', 'k1: -9.0'), 'p1 enorme': ('p1: 0.0', 'p1: 0.5'), 'k2 texto': ('k2: 0.08', 'k2: "0.08"'),
+            'k3 nan': ('k3: 0.0', 'k3: .nan'), 'modelo desconocido': ('modelo: simple', 'modelo: raro'),
+            'patrón cuadrado de 2': ('cols: 9', 'cols: 2'), 'cuadro de 1 m': ('cuadro_m: 0.025', 'cuadro_m: 1.0'),
+            'clave de distorsión desconocida': ('k1:', 'k0:'), 'rms negativo': ('rms_px: 0.12', 'rms_px: -1'),
+            'imágenes decimal': ('n_imagenes: 20', 'n_imagenes: 20.5'), 'método desconocido': ('metodo: damero', 'metodo: magia'),
+        }
+        for nombre, (a, b) in cambios.items():
+            self.assertIn(a, base, nombre)
+            self.escribir(base.replace(a, b, 1))
+            with self.assertRaises(ValueError, msg=nombre):
+                cf.cargar_camara(self.ruta)
+
+
 if __name__ == '__main__':
     unittest.main()

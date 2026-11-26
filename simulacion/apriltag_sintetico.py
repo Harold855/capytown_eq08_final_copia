@@ -26,6 +26,7 @@ import numpy as np
 
 RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ))
+from simulacion.lente import distorsionar  # noqa: E402
 from vision import herramienta as hv  # noqa: E402
 ht = hv.ht
 
@@ -46,10 +47,11 @@ def rot_y(grados: float) -> np.ndarray:
 
 def renderizar(tag_id: int, R: np.ndarray, t: Tuple[float, float, float], ancho: int, alto: int, fov_h_deg: float,
                *, desenfoque_px: float = 0.0, ruido: float = 0.0, fondo: int = 200, supermuestreo: int = 4,
-               semilla: int = 0, tamano_m: float = TAMANO_M, k1: float = 0.0) -> np.ndarray:
+               semilla: int = 0, tamano_m: float = TAMANO_M, k1: float = 0.0, dist=None) -> np.ndarray:
     """Imagen en gris de 8 bits. `R`, `t`: pose del tag (centro) en el sistema de la cámara. `tamano_m`: lado
     REAL del cuadrado negro impreso (puede diferir del nominal de 6 cm). `k1`: distorsión radial del lente
-    (modelo de OpenCV, xd = xu·(1 + k1·r²) en coordenadas normalizadas; negativo = barril, típico de gran angular)."""
+    (modelo de OpenCV, xd = xu·(1 + k1·r²) en coordenadas normalizadas; negativo = barril, típico de gran angular).
+    `dist`: coeficientes completos (k1, k2, p1, p2, k3); si se da, tiene prioridad sobre `k1`."""
     fx, fy, cx, cy = parametros_camara(ancho, alto, fov_h_deg)
     tag = ht.imagen_png(FAMILIA, tag_id, 40)
     h, w = tag.shape
@@ -58,19 +60,16 @@ def renderizar(tag_id: int, R: np.ndarray, t: Tuple[float, float, float], ancho:
     cam = esquinas_tag @ np.asarray(R).T + np.asarray(t)
     if np.any(cam[:, 2] <= 0.01):
         raise ValueError('el tag queda detrás de la cámara')
-    px = np.stack([fx * cam[:, 0] / cam[:, 2] + cx, fy * cam[:, 1] / cam[:, 2] + cy], axis=1) * supermuestreo
-    origen = np.array([[0, 0], [w, 0], [w, h], [0, h]], np.float32)
-    H = cv2.getPerspectiveTransform(origen, px.astype(np.float32))
+    px = np.stack([fx * cam[:, 0] / cam[:, 2] + cx, fy * cam[:, 1] / cam[:, 2] + cy], axis=1)
+    # convención de píxel: coordenadas de centro de píxel (ver damero_sintetico.py)
+    origen = np.array([[-0.5, -0.5], [w - 0.5, -0.5], [w - 0.5, h - 0.5], [-0.5, h - 0.5]], np.float32)
+    H = cv2.getPerspectiveTransform(origen, ((px + 0.5) * supermuestreo - 0.5).astype(np.float32))
     grande = cv2.warpPerspective(tag, H, (ancho * supermuestreo, alto * supermuestreo), flags=cv2.INTER_LINEAR,
                                  borderMode=cv2.BORDER_CONSTANT, borderValue=fondo)
     img = cv2.resize(grande, (ancho, alto), interpolation=cv2.INTER_AREA)
-    if k1 != 0.0:
-        K = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
-        uu, vv = np.meshgrid(np.arange(ancho, dtype=np.float32), np.arange(alto, dtype=np.float32))
-        pts = np.stack([uu.ravel(), vv.ravel()], 1).reshape(-1, 1, 2)
-        sin = cv2.undistortPoints(pts, K, np.array([k1, 0, 0, 0, 0]), P=K).reshape(alto, ancho, 2)
-        img = cv2.remap(img, sin[..., 0].astype(np.float32), sin[..., 1].astype(np.float32), cv2.INTER_LINEAR,
-                        borderValue=fondo)
+    coef = tuple(dist) if dist is not None else ((k1,) if k1 != 0.0 else ())
+    if coef:
+        img = distorsionar(img, np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]]), coef, fondo)
     img = img.astype(np.float32)
     if desenfoque_px > 0:
         img = cv2.GaussianBlur(img, (0, 0), desenfoque_px)

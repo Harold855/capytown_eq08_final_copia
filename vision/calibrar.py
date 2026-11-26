@@ -86,12 +86,14 @@ def _params(f: float, ancho: int, alto: int) -> Tuple[float, float, float, float
 
 
 def medir_grupos(caps: Sequence[Captura], params: Tuple[float, float, float, float], tamano_m: float,
-                 tag_id: Optional[int]) -> Tuple[Dict[Tuple[float, str], List[Tuple[float, float]]], List[str]]:
-    """{(distancia, posición): [(z_cm, dth)]} y los nombres de las imágenes sin tag válido."""
+                 tag_id: Optional[int], corrector: Optional[Callable[[Any], Any]] = None
+                 ) -> Tuple[Dict[Tuple[float, str], List[Tuple[float, float]]], List[str]]:
+    """{(distancia, posición): [(z_cm, dth)]} y los nombres de las imágenes sin tag válido. `corrector` quita la
+    distorsión del lente antes de detectar (`vision.herramienta.Corrector`)."""
     grupos: Dict[Tuple[float, str], List[Tuple[float, float]]] = {}
     sin_tag: List[str] = []
     for c in caps:
-        d = hv.pose_tag(c.imagen, params, tamano_m, tag_id)
+        d = hv.pose_tag(corrector(c.imagen) if corrector else c.imagen, params, tamano_m, tag_id)
         if d is None:
             sin_tag.append(c.nombre)
             continue
@@ -183,15 +185,20 @@ class ResultadoValidacion:
     max_error_cm: float
     tolerancia_cm: float
     sin_tag: Tuple[str, ...]
+    offset_cm: float = 0.0
+    offset_estimado: bool = False      # True si la calibración (damero) no trae offset y se estimó con estas capturas
+    corregida: bool = False            # True si se corrigió la distorsión antes de medir
 
     @property
     def ok(self) -> bool:
         return self.max_error_cm <= self.tolerancia_cm
 
 
-def validar(ruta_camara: str, ruta_csv: Path, tag_id: Optional[int] = None, tolerancia_cm: float = 1.0
-            ) -> ResultadoValidacion:
-    """Mide con la calibración guardada capturas NUEVAS (otras distancias) y compara con la regla."""
+def validar(ruta_camara: str, ruta_csv: Path, tag_id: Optional[int] = None, tolerancia_cm: float = 1.0,
+            tamano_mm: Optional[float] = None) -> ResultadoValidacion:
+    """Mide con la calibración guardada capturas NUEVAS (otras distancias y posiciones) y compara con la regla.
+    Si la calibración es de damero: corrige la distorsión antes de medir, pide `tamano_mm` (no lo guarda) y estima
+    el offset de la regla con las propias capturas centradas (el damero no lo conoce)."""
     if not math.isfinite(tolerancia_cm) or tolerancia_cm <= 0:
         raise ErrorCalibracion('la tolerancia debe ser positiva')
     cam = cargar_camara(ruta_camara)
@@ -200,14 +207,31 @@ def validar(ruta_camara: str, ruta_csv: Path, tag_id: Optional[int] = None, tole
     if (ancho, alto) != (cam.ancho, cam.alto):
         raise ErrorCalibracion(f'las imágenes son {ancho}x{alto} y la calibración es de {cam.ancho}x{cam.alto}: '
                                'la focal en píxeles solo vale para su resolución')
-    grupos, sin_tag = medir_grupos(caps, cam.tupla(), cam.tamano_tag_m, tag_id)
+    if cam.tamano_tag_m is not None:
+        tamano_m = cam.tamano_tag_m
+    elif tamano_mm is None:
+        raise ErrorCalibracion('esta calibración (damero) no guarda el tamaño del tag: indicar --tamano-mm')
+    elif not math.isfinite(tamano_mm) or not TAMANO_MM[0] <= tamano_mm <= TAMANO_MM[1]:
+        raise ErrorCalibracion(f'--tamano-mm debe estar entre {TAMANO_MM[0]:g} y {TAMANO_MM[1]:g}')
+    else:
+        tamano_m = tamano_mm / 1000
+    corrector = hv.Corrector(cam) if cam.distorsion is not None else None
+    grupos, sin_tag = medir_grupos(caps, cam.tupla(), tamano_m, tag_id, corrector)
     if not grupos:
         raise ErrorCalibracion('no se detectó el tag en ninguna imagen')
+    medianas = {k: statistics.median(v for v, _ in g) for k, g in grupos.items()}
+    estimado = cam.offset_cm is None
+    if estimado:
+        base = [z - d for (d, pos), z in medianas.items() if pos == POSICION_CENTRO] or [z - d for (d, _), z in medianas.items()]
+        offset = statistics.median(base)
+    else:
+        offset = cam.offset_cm
     filas = []
-    for d, pos in sorted(grupos):
-        z = statistics.median(v for v, _ in grupos[(d, pos)]) - cam.offset_cm
+    for (d, pos) in sorted(grupos):
+        z = medianas[(d, pos)] - offset
         filas.append((d, pos, z, z - d))
-    return ResultadoValidacion(tuple(filas), max(abs(e) for _, _, _, e in filas), tolerancia_cm, tuple(sin_tag))
+    return ResultadoValidacion(tuple(filas), max(abs(e) for _, _, _, e in filas), tolerancia_cm, tuple(sin_tag), offset,
+                               estimado, corrector is not None)
 
 
 def informe_validacion(r: ResultadoValidacion) -> str:
@@ -218,6 +242,11 @@ def informe_validacion(r: ResultadoValidacion) -> str:
                       "tag a los lados del cuadro a la misma distancia (posicion izq, der...).")
     lineas.append(f'error máximo {r.max_error_cm:.2f} cm (tolerancia {r.tolerancia_cm:g} cm): '
                   + ('CUMPLE' if r.ok else 'NO CUMPLE: repetir la calibración'))
+    if r.corregida:
+        lineas.append('(la distorsión del lente se corrigió antes de medir)')
+    if r.offset_estimado:
+        lineas.append(f'AVISO: la calibración no trae offset de la regla; se estimó con estas capturas ({r.offset_cm:+.2f} cm). '
+                      'Mide la coherencia entre distancias y posiciones, no la exactitud absoluta.')
     if r.sin_tag:
         lineas.append(f'AVISO: {len(r.sin_tag)} imagen(es) sin tag válido')
     return '\n'.join(lineas)

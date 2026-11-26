@@ -62,6 +62,7 @@ def construir_parser():
     v.add_argument('--csv', required=True)
     v.add_argument('--tag-id', type=int)
     v.add_argument('--tolerancia-cm', type=float, default=1.0, help='error máximo admitido en z (defecto 1 cm)')
+    v.add_argument('--tamano-mm', type=float, help='lado del tag; obligatorio si la calibración es de damero (no lo guarda)')
     return p
 
 
@@ -103,7 +104,7 @@ def main(argv=None):
             guardar_camara(str(destino), r.parametros)
             print(f'\nguardado: {destino}\nusar con la herramienta del docente:\n  {cal.comando_herramienta(r.parametros)}')
             return 0
-        r = cal.validar(args.camara_yaml, Path(args.csv), args.tag_id, args.tolerancia_cm)
+        r = cal.validar(args.camara_yaml, Path(args.csv), args.tag_id, args.tolerancia_cm, args.tamano_mm)
         print(cal.informe_validacion(r))
         return 0 if r.ok else 2
     except (ErrorCalibracion, ErrorYaml, cal.ht.ErrorHerramienta) as e:

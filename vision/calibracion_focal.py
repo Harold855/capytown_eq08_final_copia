@@ -125,28 +125,53 @@ def ajustar_focal(distancias_cm: Sequence[float], z_estimada_cm: Callable[[float
 
 
 # ------------------------------------------------------------------ resultado en YAML
+METODOS = ('regla', 'damero')
+CLAVES_DISTORSION = ('k1', 'k2', 'p1', 'p2', 'k3')
+LIMITES_DISTORSION = {'k1': 3.0, 'k2': 10.0, 'p1': 0.1, 'p2': 0.1, 'k3': 50.0}   # valores absurdos = ajuste roto
+
+
+@dataclass(frozen=True)
+class DetalleDamero:
+    cols: int                   # esquinas interiores por fila
+    filas: int
+    cuadro_m: float
+    modelo: str                 # 'simple' (k1, k2) o 'completo' (k1, k2, p1, p2, k3)
+    rms_px: float               # error de reproyección con todas las imágenes
+    rms_validacion_px: Optional[float]   # error en imágenes que no se usaron para ajustar
+    n_imagenes: int
+
+
 @dataclass(frozen=True)
 class ParametrosCamara:
+    """Intrínsecos de la cámara. Con método 'regla' llevan tamaño de tag y offset; con 'damero' llevan
+    distorsión y el detalle del patrón. fx = fy; el punto principal es el de la imagen en 'regla'."""
     ancho: int
     alto: int
     fx: float
     fy: float
     cx: float
     cy: float
-    tamano_tag_m: float
-    offset_cm: float
-    rms_cm: float
-    n_distancias: int
-    rango_cm: Tuple[float, float]
+    tamano_tag_m: Optional[float]
+    offset_cm: Optional[float]
+    rms_cm: Optional[float]
+    n_distancias: Optional[int]
+    rango_cm: Optional[Tuple[float, float]]
     fecha: str
     advertencias: Tuple[str, ...] = ()
+    distorsion: Optional[Tuple[float, float, float, float, float]] = None   # (k1, k2, p1, p2, k3)
+    damero: Optional[DetalleDamero] = None
+
+    @property
+    def metodo(self) -> str:
+        return 'damero' if self.damero is not None else 'regla'
 
     @property
     def fov_h_deg(self) -> float:
         return fov_desde_focal(self.ancho, self.fx)
 
     def tupla(self) -> Tuple[float, float, float, float]:
-        """(fx, fy, cx, cy): lo que espera `herramienta_apriltag.detectar_en`."""
+        """(fx, fy, cx, cy): lo que espera `herramienta_apriltag.detectar_en`. Con distorsión, la imagen debe
+        corregirse ANTES (vision.herramienta.Corrector); estos valores son los de la imagen corregida."""
         return self.fx, self.fy, self.cx, self.cy
 
 
@@ -158,20 +183,7 @@ def parametros_desde_ajuste(a: Ajuste, ancho: int, alto: int, tamano_tag_m: floa
         fecha or datetime.datetime.now().isoformat(timespec='seconds'), a.advertencias)
 
 
-def guardar_camara(ruta: str, p: ParametrosCamara) -> None:
-    """Escritura atómica. Es un RESULTADO de la calibración: va a la carpeta del experimento, con fecha."""
-    datos = {
-        'version': VERSION,
-        'imagen': {'ancho': p.ancho, 'alto': p.alto},
-        'intrinsecos': {'fx': p.fx, 'fy': p.fy, 'cx': p.cx, 'cy': p.cy},
-        'tag': {'tamano_m': p.tamano_tag_m},
-        'ajuste': {'metodo': 'regla', 'fov_h_deg': round(p.fov_h_deg, 3), 'offset_cm': p.offset_cm,
-                   'rms_cm': p.rms_cm, 'n_distancias': p.n_distancias, 'rango_cm': list(p.rango_cm),
-                   'fecha': p.fecha, 'advertencias': list(p.advertencias)},
-    }
-    texto = ye.volcar(datos, 'Calibración de la cámara con regla y AprilTag, generada por vision/calibrar.py.\n'
-                             'Supone punto principal en el centro y SIN distorsión. fx = fy.\n'
-                             'No editar a mano: repetir la calibración si cambia la cámara, la resolución o el foco.')
+def _escribir_atomico(ruta: str, texto: str) -> None:
     carpeta = os.path.dirname(os.path.abspath(ruta))
     fd, tmp = tempfile.mkstemp(dir=carpeta, prefix='.camara_', suffix='.tmp')
     try:
@@ -184,10 +196,42 @@ def guardar_camara(ruta: str, p: ParametrosCamara) -> None:
         raise
 
 
+def guardar_camara(ruta: str, p: ParametrosCamara) -> None:
+    """Escritura atómica. Es un RESULTADO de la calibración: va a la carpeta del experimento, con fecha."""
+    datos = {'version': VERSION, 'imagen': {'ancho': p.ancho, 'alto': p.alto},
+             'intrinsecos': {'fx': p.fx, 'fy': p.fy, 'cx': p.cx, 'cy': p.cy}}
+    if p.metodo == 'regla':
+        datos['tag'] = {'tamano_m': p.tamano_tag_m}
+        datos['ajuste'] = {'metodo': 'regla', 'fov_h_deg': round(p.fov_h_deg, 3), 'offset_cm': p.offset_cm,
+                           'rms_cm': p.rms_cm, 'n_distancias': p.n_distancias, 'rango_cm': list(p.rango_cm),
+                           'fecha': p.fecha, 'advertencias': list(p.advertencias)}
+        cabecera = ('Calibración de la cámara con regla y AprilTag, generada por vision/calibrar.py.\n'
+                    'Supone punto principal en el centro y SIN distorsión. fx = fy.\n')
+    else:
+        d = p.damero
+        datos['distorsion'] = dict(zip(CLAVES_DISTORSION, p.distorsion))
+        datos['ajuste'] = {'metodo': 'damero', 'fov_h_deg': round(p.fov_h_deg, 3), 'modelo': d.modelo,
+                           'rms_px': d.rms_px, 'rms_validacion_px': d.rms_validacion_px, 'n_imagenes': d.n_imagenes,
+                           'patron': {'cols': d.cols, 'filas': d.filas, 'cuadro_m': d.cuadro_m},
+                           'fecha': p.fecha, 'advertencias': list(p.advertencias)}
+        cabecera = ('Calibración de la cámara con damero, generada por vision/calibracion_damero.py.\n'
+                    'Hay distorsión: corregir cada imagen (vision.herramienta.Corrector) ANTES de detectar el tag; '
+                    'fx, fy, cx, cy son los de la imagen corregida.\n')
+    _escribir_atomico(ruta, ye.volcar(datos, cabecera + 'No editar a mano: repetir la calibración si cambia la '
+                                                         'cámara, la resolución o el foco.'))
+
+
+def _lista_numeros(v, nombre: str, n: int) -> List[float]:
+    if (not isinstance(v, list) or len(v) != n or any(isinstance(x, bool) or not isinstance(x, (int, float))
+                                                      or not math.isfinite(x) for x in v)):
+        raise ye.ErrorYaml(f'{nombre}: debe ser una lista de {n} números')
+    return [float(x) for x in v]
+
+
 def cargar_camara(ruta: str) -> ParametrosCamara:
     """Falla (ErrorYaml, ValueError) ante cualquier valor dudoso, clave desconocida o duplicada."""
     d = ye.cargar_mapeo(ruta)
-    ye.exigir_claves(d, 'camara', ('version', 'imagen', 'intrinsecos', 'tag', 'ajuste'))
+    ye.exigir_claves(d, 'camara', ('version', 'imagen', 'intrinsecos', 'ajuste'), ('tag', 'distorsion'))
     if d['version'] != VERSION or isinstance(d['version'], bool):
         raise ye.ErrorYaml('camara: versión desconocida')
     im = ye.seccion(d, 'imagen', 'camara')
@@ -199,22 +243,47 @@ def cargar_camara(ruta: str) -> ParametrosCamara:
     fy = ye.numero(it, 'fy', 'camara.intrinsecos', 0, exclusivo_min=True)
     cx = ye.numero(it, 'cx', 'camara.intrinsecos', 0, ancho)
     cy = ye.numero(it, 'cy', 'camara.intrinsecos', 0, alto)
-    tag = ye.seccion(d, 'tag', 'camara')
-    ye.exigir_claves(tag, 'camara.tag', ('tamano_m',))
-    tamano = ye.numero(tag, 'tamano_m', 'camara.tag', 0.005, 0.5)
     aj = ye.seccion(d, 'ajuste', 'camara')
-    ye.exigir_claves(aj, 'camara.ajuste', ('metodo', 'fov_h_deg', 'offset_cm', 'rms_cm', 'n_distancias', 'rango_cm',
-                                           'fecha', 'advertencias'))
-    if aj['metodo'] != 'regla':
-        raise ye.ErrorYaml("camara.ajuste.metodo: solo se admite 'regla'")
-    rango = aj['rango_cm']
-    if (not isinstance(rango, list) or len(rango) != 2 or any(isinstance(v, bool) or not isinstance(v, (int, float))
-                                                              or not math.isfinite(v) for v in rango)):
-        raise ye.ErrorYaml('camara.ajuste.rango_cm: debe ser [mínimo, máximo]')
-    adv = aj['advertencias']
+    metodo = aj.get('metodo')
+    if metodo not in METODOS:
+        raise ye.ErrorYaml(f"camara.ajuste.metodo: debe ser uno de {', '.join(METODOS)}")
+    adv = aj.get('advertencias')
     if not isinstance(adv, list) or not all(isinstance(a, str) for a in adv):
         raise ye.ErrorYaml('camara.ajuste.advertencias: debe ser una lista de textos')
-    return ParametrosCamara(
-        ancho, alto, fx, fy, cx, cy, tamano, ye.numero(aj, 'offset_cm', 'camara.ajuste', -50, 50),
-        ye.numero(aj, 'rms_cm', 'camara.ajuste', 0, 100), ye.entero(aj, 'n_distancias', 'camara.ajuste', 1, 1000),
-        (float(rango[0]), float(rango[1])), ye.texto(aj, 'fecha', 'camara.ajuste'), tuple(adv))
+    fecha = ye.texto(aj, 'fecha', 'camara.ajuste')
+
+    if metodo == 'regla':
+        if 'distorsion' in d:
+            raise ye.ErrorYaml("camara: el método 'regla' no admite 'distorsion' (supone un lente sin distorsión)")
+        tag = ye.seccion(d, 'tag', 'camara')
+        ye.exigir_claves(tag, 'camara.tag', ('tamano_m',))
+        tamano = ye.numero(tag, 'tamano_m', 'camara.tag', 0.005, 0.5)
+        ye.exigir_claves(aj, 'camara.ajuste', ('metodo', 'fov_h_deg', 'offset_cm', 'rms_cm', 'n_distancias', 'rango_cm',
+                                               'fecha', 'advertencias'))
+        rango = _lista_numeros(aj['rango_cm'], 'camara.ajuste.rango_cm', 2)
+        return ParametrosCamara(
+            ancho, alto, fx, fy, cx, cy, tamano, ye.numero(aj, 'offset_cm', 'camara.ajuste', -50, 50),
+            ye.numero(aj, 'rms_cm', 'camara.ajuste', 0, 100), ye.entero(aj, 'n_distancias', 'camara.ajuste', 1, 1000),
+            (rango[0], rango[1]), fecha, tuple(adv))
+
+    if 'tag' in d:
+        raise ye.ErrorYaml("camara: el método 'damero' no lleva 'tag' (el tamaño del tag se da al medir)")
+    if 'distorsion' not in d:
+        raise ye.ErrorYaml("camara: el método 'damero' requiere la sección 'distorsion'")
+    dis = ye.seccion(d, 'distorsion', 'camara')
+    ye.exigir_claves(dis, 'camara.distorsion', CLAVES_DISTORSION)
+    coef = tuple(ye.numero(dis, k, 'camara.distorsion', -LIMITES_DISTORSION[k], LIMITES_DISTORSION[k])
+                 for k in CLAVES_DISTORSION)
+    ye.exigir_claves(aj, 'camara.ajuste', ('metodo', 'fov_h_deg', 'modelo', 'rms_px', 'rms_validacion_px',
+                                           'n_imagenes', 'patron', 'fecha', 'advertencias'))
+    if aj['modelo'] not in ('simple', 'completo'):
+        raise ye.ErrorYaml("camara.ajuste.modelo: debe ser 'simple' o 'completo'")
+    pat = ye.seccion(aj, 'patron', 'camara.ajuste')
+    ye.exigir_claves(pat, 'camara.ajuste.patron', ('cols', 'filas', 'cuadro_m'))
+    detalle = DetalleDamero(
+        ye.entero(pat, 'cols', 'camara.ajuste.patron', 3, 50), ye.entero(pat, 'filas', 'camara.ajuste.patron', 3, 50),
+        ye.numero(pat, 'cuadro_m', 'camara.ajuste.patron', 0.002, 0.2), aj['modelo'],
+        ye.numero(aj, 'rms_px', 'camara.ajuste', 0, 1000),
+        ye.numero(aj, 'rms_validacion_px', 'camara.ajuste', 0, 1000, permitir_none=True),
+        ye.entero(aj, 'n_imagenes', 'camara.ajuste', 3, 10000))
+    return ParametrosCamara(ancho, alto, fx, fy, cx, cy, None, None, None, None, None, fecha, tuple(adv), coef, detalle)

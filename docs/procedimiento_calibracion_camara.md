@@ -72,9 +72,9 @@ python3 scripts/camara/calibrar_focal.py validar --camara-yaml experimentos/dia0
 ```
 Para `izq` y `der`: desplazar el tag lateralmente (hasta que quede cerca del borde del cuadro, entero a la vista) **sin cambiar la distancia al plano de la cámara**. La `z` debe salir igual que en el centro.
 
-**Por qué los lados:** en simulación, un lente con distorsión de barril no cambia la focal ajustada ni el error del ajuste, pero el error de `z` fuera del eje crece: con `k1 = −0.25` un tag a 10 cm del centro da 1.0 cm de error y con `k1 = −0.4`, 1.6 cm. Solo se ve validando fuera del centro. Criterio: **error ≤ 1 cm en todas las posiciones** (la tolerancia del acople es 4 cm: este paso se queda con la cuarta parte del presupuesto). El comando devuelve código 0 si cumple y 2 si no.
+**Por qué los lados:** en simulación, un lente con distorsión de barril no cambia la focal ajustada ni el error del ajuste, pero el error de `z` fuera del eje crece: con `k1 = −0.25` un tag a 10 cm del centro da 1.0 cm de error y con `k1 = −0.4`, 1.7 cm. Solo se ve validando fuera del centro. Criterio: **error ≤ 1 cm en todas las posiciones** (la tolerancia del acople es 4 cm: este paso se queda con la cuarta parte del presupuesto). El comando devuelve código 0 si cumple y 2 si no.
 
-**Si falla fuera del eje:** el lente distorsiona y este método no lo corrige. Hay que calibrar con un damero (`cv2.calibrateCamera`) para obtener también los coeficientes de distorsión. Ese script **no está hecho**; avisar y se prepara.
+**Si falla fuera del eje:** el lente distorsiona y este método no lo corrige. Calibrar con damero para obtener también los coeficientes de distorsión: [`procedimiento_calibracion_damero.md`](procedimiento_calibracion_damero.md). Después se vuelve a ejecutar este `validar` con el `camara_calibrada.yaml` del damero y `--tamano-mm`.
 
 ## 7. Registrar y usar
 - Guardar en la bitácora (`docs/bitacora_laboratorio.md`): fecha, quién, lado del tag medido, resolución, resultado (focal, campo de visión, offset, rms), resultado de la validación y rutas de los archivos.

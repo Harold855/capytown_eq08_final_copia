@@ -5,7 +5,8 @@ Qué hay y cuándo leerlo. Los documentos están agrupados por lo que se necesit
 ## Para entender el proyecto y su estado
 | Documento | Qué contiene |
 |---|---|
-| [`../README.md`](../README.md) | Descripción del proyecto, reglas, pit, tópicos MQTT, rúbrica, riesgos y preguntas abiertas |
+| [`../README.md`](../README.md) | Página de entrada: equipo, datos, resumen del reto, circuito, pit, rúbrica y estado |
+| [`referencia_del_reto.md`](referencia_del_reto.md) | El detalle del reto: reglas, pit, reparto de módulos, intervenciones, tópicos MQTT, evidencia, rúbrica, antecedentes, riesgos y preguntas abiertas al docente |
 | [`desarrollo_realizado.md`](desarrollo_realizado.md) | **Registro de todo lo construido**: estado de cada pieza, evidencia, hallazgos con cifras, errores corregidos, qué falta |
 | [`arquitectura.md`](arquitectura.md) | Cómo encaja el código del equipo con la arquitectura del curso, dependencias entre paquetes, flujos y adaptadores pendientes |
 | [`requerimientos.md`](requerimientos.md) | Cada requisito del reto, qué lo cubre, qué prueba lo comprueba y en qué estado está |

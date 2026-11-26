@@ -18,7 +18,7 @@ Otros documentos: arquitectura en [`arquitectura.md`](arquitectura.md), requisit
 
 | Bloque | Qué hay | Estado |
 |---|---|---|
-| Análisis y contexto | `docs/contexto_analisis.md`, README ampliado (18 secciones), división v1.3 como guía | Documentos |
+| Análisis y contexto | `docs/contexto_analisis.md`, README de entrada y `docs/referencia_del_reto.md` (el detalle del reto), división v1.3 como guía | Documentos |
 | Repositorio del docente | `vendor/granprix/` (89 archivos, sin modificar, commit `285c829`) | Verificado: 126 pruebas de `pc-race` y 24 de la herramienta AprilTag (familia `tag36h11`) pasan |
 | ROSCar: base de laboratorio | `scripts/roscar_v01/` (v0.1 entregada + registro, análisis, contrato y diagnóstico), `scripts/historicos/` (RC-0 y RC-1), procedimiento de laboratorio | Verificado en lo puro; el código que usa `rclpy` **sin verificar** |
 | ROSCar: planificador | `carrito/granprix_carrito/planificador.py`, `docks.py` | Verificado; equivale al `simulate()` del HTML a 1e-9 |
@@ -60,7 +60,7 @@ Otros documentos: arquitectura en [`arquitectura.md`](arquitectura.md), requisit
 ## 3. Mapa del repositorio
 
 ```
-README.md                      descripción del proyecto (18 secciones)
+README.md                      página de entrada: equipo, datos, resumen del reto, estado
 contexto_division_reto_final.md  división del equipo v1.3 (del equipo, guía del desarrollo)
 docs/                          documentación (índice en docs/README.md)
 vendor/granprix/               copia fija del repositorio del docente (NO se edita)
@@ -233,7 +233,7 @@ Además, las del docente: `pc-race` (126, en el entorno con `--pc-race`) y la he
 | Perfil de velocidad | 0.10 m/s y 0.50 rad/s | `movimiento.yaml` |
 | Usuario MQTT | `carrito08` | `mqtt.yaml` |
 
-Preguntas para el docente que siguen abiertas (README sección 15 las lista): firma exacta de `BrazoJetCobot`, `dock_frames.yaml`, si `solicitud` y `resultado` llevan identificadores, qué cuenta el presupuesto de 10 s (giro de salida, segunda medición), qué es "error después del pit", cómo se cuentan las paradas ya dentro de tolerancia en el criterio de 70 %, si se puede cerrar el giro con IMU u odometría, y si `cd` y `ca` pueden iniciarse con valores calibrados.
+Preguntas para el docente que siguen abiertas (`referencia_del_reto.md` §15 las lista): firma exacta de `BrazoJetCobot`, `dock_frames.yaml`, si `solicitud` y `resultado` llevan identificadores, qué cuenta el presupuesto de 10 s (giro de salida, segunda medición), qué es "error después del pit", cómo se cuentan las paradas ya dentro de tolerancia en el criterio de 70 %, si se puede cerrar el giro con IMU u odometría, y si `cd` y `ca` pueden iniciarse con valores calibrados.
 
 ## 9. Trazabilidad con la división v1.3
 

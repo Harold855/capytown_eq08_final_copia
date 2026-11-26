@@ -1,6 +1,6 @@
 # Requisitos y su cobertura
 
-Cada requisito indica su fuente, qué parte del código lo cubre, qué prueba lo comprueba y en qué estado está. Las fuentes son el HTML del reto, el repositorio del docente (`vendor/granprix`, que **manda**), el README (secciones 7, 8 y 13) y la división del equipo v1.3. Una prueba que pasa en simulación **no** demuestra que el requisito se cumpla en el robot: por eso hay una columna de estado separada.
+Cada requisito indica su fuente, qué parte del código lo cubre, qué prueba lo comprueba y en qué estado está. Las fuentes son el HTML del reto, el repositorio del docente (`vendor/granprix`, que **manda**), la referencia del reto (**Ref.** = [`referencia_del_reto.md`](referencia_del_reto.md), el detalle que estaba en el README inicial; secciones 6, 7, 8, 13 y 15) y la división del equipo v1.3. Una prueba que pasa en simulación **no** demuestra que el requisito se cumpla en el robot: por eso hay una columna de estado separada.
 
 **Estados:** *Verificado* = lógica con pruebas automáticas que pasan · *Simulado* = solo contra un modelo, una cámara o un brazo sintéticos · *Configurado* = existe como dato pero ningún programa lo usa todavía · *Pendiente* = no existe · *Abierto* = falta definición del docente.
 
@@ -8,21 +8,21 @@ Cada requisito indica su fuente, qué parte del código lo cubre, qué prueba lo
 
 | ID | Requisito | Fuente | Cobertura | Prueba | Estado |
 |---|---|---|---|---|---|
-| RQ-01 | Cuatro vueltas consecutivas en 12 min como máximo | README §7 | `planificador.tiempo_vuelta`: 116.57 s por vuelta con pit de 6 s, 466.27 s las cuatro, sin aceleración ni reintentos | `tests/carrito/test_planificador.py` | Simulado (cota ideal) |
-| RQ-02 | Pit ≤ 10 s, desde que el carrito frena hasta que arranca | README §7 | `estacion.yaml: tiempo_max_s` (8 s, propio, ≤ 10 s por el cargador); `scripts/jetcobot_v01/cronometro_ciclo.py` | `tests/estacion/test_configuracion.py` | **Pendiente medir.** Con duraciones de ejemplo E2/E3 tardan 15.4 s |
-| RQ-03 | Tolerancia de posición ≤ 4 cm | README §7 | `planificador.acople_valido`; `estrategia`; el cargador rechaza tolerancias mayores | `test_planificador.py`, `tests/estacion/` | Verificado (lógica) |
-| RQ-04 | Tolerancia angular ≤ 6° (ambas a la vez) | README §7 | idem | idem | Verificado (lógica) |
-| RQ-05 | Máximo 2 reintentos automáticos de acople por parada | README §7, doc. 03 | — (el modelo del HTML los simula) | — | **Pendiente** (máquina de estados) |
-| RQ-06 | Velocidad ≤ 0.20 m/s y ≤ 0.8 rad/s | README §7 | `comandar`, `EjecutorMovimiento.iniciar` y el recorte de `_publicar`; el cargador de `movimiento.yaml` | `test_ejecutor.py`, `test_planificador.py`, `test_configuracion.py` | Verificado (lógica) |
-| RQ-07 | Referencia de velocidad 0.10 m/s y 0.5 rad/s | README §7 | `movimiento.yaml` y `V_REF`/`W_REF` | `test_configuracion.py` (YAML = código) | Verificado |
-| RQ-08 | Docks D1 (0.40, 0.40, −90°), D2 (2.40, 0.40, 0°), D3 (2.40, 2.40, +90°), D4 (0.40, 2.40, 180°) | HTML / README §6 | `docks.DOCKS_HTML` | `test_docks.py` | Verificado |
-| RQ-09 | Giro `φ = wrap(atan2(dy, dx) − θ)`, distancia `L = hypot(dx, dy)`, ejecución en lazo abierto como `φ/ca` y `L/cd` | README §8 | `planificar_tramo`, `comandar` | `test_planificador.py`; `test_equivalencia_html.py` (18 casos, 288 llegadas, 1e-9 contra el JavaScript original) | Verificado |
-| RQ-10 | Estimador `escala_nueva = escala + α·(medido/comandado − escala)`, α = 0.35 de referencia, paso limitado | README §8 | `actualizar_escalas`, `EstimadorEscalas` | `test_calibracion.py`, `test_equivalencia_html.py` | Simulado. Las protecciones numéricas son del equipo |
-| RQ-11 | Error posterior menor que el anterior en ≥ 70 % de las paradas | README §13 (Pit) | `evaluar_reduccion` | `test_calibracion.py` | Verificado (cálculo). **Abierto:** cómo cuentan las paradas ya dentro de tolerancia |
-| RQ-12 | Escalas convergentes | README §13 (Pit) | `EstimadorEscalas.convergio()` (4 actualizaciones, diferencia < 0.01) | `test_calibracion.py` | Simulado. Umbral provisional |
-| RQ-13 | Orden del pit: medir → acoplar → solicitar → resultado → medir → reset → recalibrar | README §8, doc. 03 | Piezas sueltas (ver `arquitectura.md` §6) | — | **Pendiente** (máquina de estados) |
-| RQ-14 | Reset de pose (`map → odom`) con la pose medida | README §8 | — | — | **Pendiente** |
-| RQ-15 | Cada parada guarda el error antes y después | README §8 | `EstimadorEscalas.registros` y `exportar_csv` guardan las razones y escalas; no hay registro de errores del acople | `test_calibracion.py` | Parcial |
+| RQ-01 | Cuatro vueltas consecutivas en 12 min como máximo | Ref. §7 | `planificador.tiempo_vuelta`: 116.57 s por vuelta con pit de 6 s, 466.27 s las cuatro, sin aceleración ni reintentos | `tests/carrito/test_planificador.py` | Simulado (cota ideal) |
+| RQ-02 | Pit ≤ 10 s, desde que el carrito frena hasta que arranca | Ref. §7 | `estacion.yaml: tiempo_max_s` (8 s, propio, ≤ 10 s por el cargador); `scripts/jetcobot_v01/cronometro_ciclo.py` | `tests/estacion/test_configuracion.py` | **Pendiente medir.** Con duraciones de ejemplo E2/E3 tardan 15.4 s |
+| RQ-03 | Tolerancia de posición ≤ 4 cm | Ref. §7 | `planificador.acople_valido`; `estrategia`; el cargador rechaza tolerancias mayores | `test_planificador.py`, `tests/estacion/` | Verificado (lógica) |
+| RQ-04 | Tolerancia angular ≤ 6° (ambas a la vez) | Ref. §7 | idem | idem | Verificado (lógica) |
+| RQ-05 | Máximo 2 reintentos automáticos de acople por parada | Ref. §7, doc. 03 | — (el modelo del HTML los simula) | — | **Pendiente** (máquina de estados) |
+| RQ-06 | Velocidad ≤ 0.20 m/s y ≤ 0.8 rad/s | Ref. §7 | `comandar`, `EjecutorMovimiento.iniciar` y el recorte de `_publicar`; el cargador de `movimiento.yaml` | `test_ejecutor.py`, `test_planificador.py`, `test_configuracion.py` | Verificado (lógica) |
+| RQ-07 | Referencia de velocidad 0.10 m/s y 0.5 rad/s | Ref. §7 | `movimiento.yaml` y `V_REF`/`W_REF` | `test_configuracion.py` (YAML = código) | Verificado |
+| RQ-08 | Docks D1 (0.40, 0.40, −90°), D2 (2.40, 0.40, 0°), D3 (2.40, 2.40, +90°), D4 (0.40, 2.40, 180°) | HTML / Ref. §6 | `docks.DOCKS_HTML` | `test_docks.py` | Verificado |
+| RQ-09 | Giro `φ = wrap(atan2(dy, dx) − θ)`, distancia `L = hypot(dx, dy)`, ejecución en lazo abierto como `φ/ca` y `L/cd` | Ref. §8 | `planificar_tramo`, `comandar` | `test_planificador.py`; `test_equivalencia_html.py` (18 casos, 288 llegadas, 1e-9 contra el JavaScript original) | Verificado |
+| RQ-10 | Estimador `escala_nueva = escala + α·(medido/comandado − escala)`, α = 0.35 de referencia, paso limitado | Ref. §8 | `actualizar_escalas`, `EstimadorEscalas` | `test_calibracion.py`, `test_equivalencia_html.py` | Simulado. Las protecciones numéricas son del equipo |
+| RQ-11 | Error posterior menor que el anterior en ≥ 70 % de las paradas | Ref. §13 (Pit) | `evaluar_reduccion` | `test_calibracion.py` | Verificado (cálculo). **Abierto:** cómo cuentan las paradas ya dentro de tolerancia |
+| RQ-12 | Escalas convergentes | Ref. §13 (Pit) | `EstimadorEscalas.convergio()` (4 actualizaciones, diferencia < 0.01) | `test_calibracion.py` | Simulado. Umbral provisional |
+| RQ-13 | Orden del pit: medir → acoplar → solicitar → resultado → medir → reset → recalibrar | Ref. §8, doc. 03 | Piezas sueltas (ver `arquitectura.md` §6) | — | **Pendiente** (máquina de estados) |
+| RQ-14 | Reset de pose (`map → odom`) con la pose medida | Ref. §8 | — | — | **Pendiente** |
+| RQ-15 | Cada parada guarda el error antes y después | Ref. §8 | `EstimadorEscalas.registros` y `exportar_csv` guardan las razones y escalas; no hay registro de errores del acople | `test_calibracion.py` | Parcial |
 
 ## 2. Comunicación y contrato
 
@@ -40,7 +40,7 @@ Cada requisito indica su fuente, qué parte del código lo cubre, qué prueba lo
 
 | ID | Requisito | Fuente | Cobertura | Prueba | Estado |
 |---|---|---|---|---|---|
-| RQ-23 | AprilTag `tag36h11` de 6 cm; pose medida por el carrito en el marco del dock | README §8, doc. 03 | `vision/herramienta.py` y `vision/medicion.py` (`medir_tag.py`) sobre la herramienta del docente; `simulacion/apriltag_sintetico.py` | `test_apriltag_sintetico.py`, `test_medicion.py` | Simulado. **Falta** el marco del dock (`dock_frames.yaml`) y el nodo de cámara |
+| RQ-23 | AprilTag `tag36h11` de 6 cm; pose medida por el carrito en el marco del dock | Ref. §8, doc. 03 | `vision/herramienta.py` y `vision/medicion.py` (`medir_tag.py`) sobre la herramienta del docente; `simulacion/apriltag_sintetico.py` | `test_apriltag_sintetico.py`, `test_medicion.py` | Simulado. **Falta** el marco del dock (`dock_frames.yaml`) y el nodo de cámara |
 | RQ-24 | Precisión de la pose suficiente para decidir con margen una tolerancia de 4 cm y 6° | división §1.3 | calibración de cámara con regla y con damero; barridos de precisión | `tests/vision/` | Simulado. Hallazgo: con un campo de visión supuesto 6 % mal, `z` falla 2 cm. **Pendiente** medir con la cámara real |
 | RQ-25 | No hay falsas aceptaciones: ante dos tags, otro id, poca calidad o inestabilidad no se entrega pose | división §1.3 | `CamaraTag.medir` y `agregar`: la medición no válida lleva el motivo (`sin_tag`, `otro_id`, `varios_tags`, `hamming`, `margen_bajo`, `inestable_*`...) y **sin pose** | `test_medicion.py`, `test_apriltag_sintetico.py` | Verificado (lógica). Umbrales de margen, hamming y dispersión **provisionales** |
 | RQ-26 | Corregir la distorsión del lente si la hay | división §1.3 | `Corrector`, `pose_tag_calibrada`, `calibrar_damero.py` | `test_calibracion_damero.py` | Simulado |
@@ -70,12 +70,12 @@ Cada requisito indica su fuente, qué parte del código lo cubre, qué prueba lo
 
 | ID | Requisito | Fuente | Cobertura | Estado |
 |---|---|---|---|---|
-| RQ-38 | Evidencia por vuelta: video, bag completo, cinco CSV | README §13 | solo plantillas (`mediciones_fisicas.csv`, bitácora) | **Pendiente** |
-| RQ-39 | Predicción firmada con la pestaña Simulador | README §13 | `simulacion/modelo_granprix.py` (port verificado) y `barrido_alpha.py` | Herramientas listas; **falta la predicción** con parámetros medidos |
-| RQ-40 | Tablero web con todos los bloques | README §13 | — | **Pendiente** |
+| RQ-38 | Evidencia por vuelta: video, bag completo, cinco CSV | Ref. §13 | solo plantillas (`mediciones_fisicas.csv`, bitácora) | **Pendiente** |
+| RQ-39 | Predicción firmada con la pestaña Simulador | Ref. §13 | `simulacion/modelo_granprix.py` (port verificado) y `barrido_alpha.py` | Herramientas listas; **falta la predicción** con parámetros medidos |
+| RQ-40 | Tablero web con todos los bloques | Ref. §13 | — | **Pendiente** |
 | RQ-41 | Bitácora por sesión de laboratorio | división §8.1 | `docs/bitacora_laboratorio.md` (plantilla) | Plantilla lista, sin entradas |
 | RQ-42 | Reproducibilidad: un comando prepara el entorno y otro corre las pruebas | división §3.2 | `scripts/preparar_entorno.sh`, `scripts/ejecutar_pruebas.sh` | Verificado (Linux, Python 3.13) |
 | RQ-43 | Código de la Jetson compatible con su Python | doc. 02 | `estacion`, `integracion`, `comun` evitan sintaxis nueva (apuntan a 3.8) | **Sin verificar** en la Jetson |
 
 ## 7. Lo que no depende de nosotros
-Quedan abiertas con el docente (README §15): firma exacta de `BrazoJetCobot`, `dock_frames.yaml`, identificadores en `solicitud`/`resultado`, qué cuenta el presupuesto de 10 s (giro de salida, segunda medición), qué es "error después del pit", cómo se cuentan las paradas ya dentro de tolerancia en RQ-11, si se puede cerrar el giro con IMU u odometría, y si `cd` y `ca` pueden iniciarse con valores calibrados.
+Quedan abiertas con el docente (Ref. §15): firma exacta de `BrazoJetCobot`, `dock_frames.yaml`, identificadores en `solicitud`/`resultado`, qué cuenta el presupuesto de 10 s (giro de salida, segunda medición), qué es "error después del pit", cómo se cuentan las paradas ya dentro de tolerancia en RQ-11, si se puede cerrar el giro con IMU u odometría, y si `cd` y `ca` pueden iniciarse con valores calibrados.

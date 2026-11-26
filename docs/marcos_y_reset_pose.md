@@ -50,6 +50,17 @@ Diseño defensivo (umbrales provisionales y ajustables):
 - `cerca` es un argumento **obligatorio** de `inicializar` y `actualizar` (se pasa `PoseRobot.cerca`): olvidarlo es un error, no una protección omitida.
 - Un rechazo **no cambia el estado**: se conserva la referencia anterior.
 
+## Pose del ROSCar respecto al dock (`pose_dock.py`)
+`LocalizadorDock` es la interfaz para la máquina del pit; devuelve un `PoseDock` (`dx`, `dy` en m, `dth` en rad, `dth_deg`, la pose en el mapa, la fuente y si está cerca del dock).
+
+| Método | Cuándo | Qué hace |
+|---|---|---|
+| `pose_desde_tag(medicion)` | al acoplar y para la `solicitud` | pose desde una medición de `medir_tag.py`; no cambia ningún estado |
+| `aplicar_reset(pose, odom_ini, odom_fin)` | tras el intercambio, con el robot quieto | inicializa o actualiza `ResetPose`; solo acepta poses del tag; devuelve el resultado con su motivo |
+| `pose_desde_odom(estacion, odom)` | entre mediciones, cuando el tag no se ve | pose respecto al dock indicado desde la odometría y el último reset; falla si nunca hubo reset |
+
+`PoseDock.error` da `(m, °)` respecto a la cruz, `en_tolerancia` es la condición del acople (≤ 4 cm **y** ≤ 6°) y `a_contrato()` da `dx`, `dy` en m y `dth` en grados, igual que la `solicitud`. `desplazamiento_odom_m` es lo que se movió la odometría desde el último reset: **es una distancia, no una incertidumbre calculada**, pero sirve para decidir cuánto confiar (en simulación, una odometría que avanza 5 % de más acumula ≈ 5 mm en 10 cm, y un nuevo reset con el tag lo elimina).
+
 ## Resultados en simulación
 - Escena física en 3D (cámara con montaje e inclinación, tag con altura distinta): la conversión recupera la pose a 2 mm y 0.2° en la zona de acople (±4 cm y ±6°), y a 1e-9 sin inclinación.
 - Del píxel a la pose en el dock (24 poses renderizadas con distorsión de lente, corregida, y montaje **conocido**): posición p95 0.35 cm y máximo 0.46 cm; ángulo p95 0.44° y máximo 0.72°.

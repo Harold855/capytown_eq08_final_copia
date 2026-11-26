@@ -68,6 +68,7 @@ carrito.granprix_carrito
   configuracion    -> calibracion, ejecutor, planificador, comun
   marcos           -> docks, comun, geometria_dock       (cámara -> dock; cargar_marcos)
   reset_pose       -> geometria_dock                     (map -> odom)
+  pose_dock        -> docks, marcos, planificador, reset_pose, geometria_dock   (PoseDock, LocalizadorDock)
 
 app_equipo (estacion/src)
   puerto           (sin dependencias)
@@ -125,7 +126,7 @@ Orden del curso: medir → acoplar → solicitar → esperar resultado → medir
 | ¿está dentro de tolerancia? | `acople_valido`, `error_acople` | — |
 | corregir | `planificar_acople` + `EjecutorMovimiento` | orquestarlo con reintentos |
 | solicitud / resultado | constructores de `scripts/roscar_v01/mensajes_contrato.py`, tópicos de `mqtt.yaml` | publicarlos vía `puente_mqtt` |
-| reset de pose | `marcos.pose_robot` y `ResetPose` (ver `marcos_y_reset_pose.md`) | medir el montaje de la cámara; publicar el TF `map → odom` |
+| reset de pose | `LocalizadorDock.aplicar_reset` (sobre `ResetPose`; ver `marcos_y_reset_pose.md`) | medir el montaje de la cámara; publicar el TF `map → odom` |
 | recalibrar | `EstimadorEscalas.observar` | alimentarlo con la pose previa al acople |
 
 El estimador necesita la pose medida **antes** de cualquier acople, y el comando **realmente enviado**: de otro modo converge a un valor sesgado.

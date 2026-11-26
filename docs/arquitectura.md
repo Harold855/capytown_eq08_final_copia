@@ -69,6 +69,8 @@ carrito.granprix_carrito
   marcos           -> docks, comun, geometria_dock       (cámara -> dock; cargar_marcos)
   reset_pose       -> geometria_dock                     (map -> odom)
   pose_dock        -> docks, marcos, planificador, reset_pose, geometria_dock   (PoseDock, LocalizadorDock)
+  gestor_reset     -> pose_dock, reset_pose, geometria_dock                     (odometría en el tiempo, tag fresco)
+  nodos/nodo_reset_pose -> gestor_reset, marcos, pose_dock, reset_pose          (rclpy; único módulo que importa ROS)
 
 app_equipo (estacion/src)
   puerto           (sin dependencias)
@@ -126,7 +128,7 @@ Orden del curso: medir → acoplar → solicitar → esperar resultado → medir
 | ¿está dentro de tolerancia? | `acople_valido`, `error_acople` | — |
 | corregir | `planificar_acople` + `EjecutorMovimiento` | orquestarlo con reintentos |
 | solicitud / resultado | constructores de `scripts/roscar_v01/mensajes_contrato.py`, tópicos de `mqtt.yaml` | publicarlos vía `puente_mqtt` |
-| reset de pose | `LocalizadorDock.aplicar_reset` (sobre `ResetPose`; ver `marcos_y_reset_pose.md`) | medir el montaje de la cámara; publicar el TF `map → odom` |
+| reset de pose | `LocalizadorDock.aplicar_reset` (sobre `ResetPose`; ver `marcos_y_reset_pose.md`) | medir el montaje de la cámara; probar `nodos/nodo_reset_pose.py` con ROS real |
 | recalibrar | `EstimadorEscalas.observar` | alimentarlo con la pose previa al acople |
 
 El estimador necesita la pose medida **antes** de cualquier acople, y el comando **realmente enviado**: de otro modo converge a un valor sesgado.
@@ -136,7 +138,7 @@ El estimador necesita la pose medida **antes** de cualquier acople, y el comando
 2. **Cámara → ROS 2:** un nodo que use `CamaraTag` (corrige la distorsión, filtra por calidad y agrega cuadros) y publique `/tag/pose`.
 3. **Pit → MQTT:** publicar `solicitud` y `evento` y leer `resultado` y `turno` con los tópicos de `mqtt.yaml`, a través de `puente_mqtt` (del curso).
 4. **Brazo:** implementar `BrazoJetCobot` según la firma que publique el docente y ajustar `puerto.py`.
-5. **TF `map → odom`:** un publicador que use `ResetPose.map_odom` y lea `/odom` con su marca de tiempo (ver `marcos_y_reset_pose.md`).
+5. **TF `map → odom`:** escrito (`carrito/nodos/nodo_reset_pose.py`, sobre `gestor_reset.py`) pero **solo probado contra un sustituto de `rclpy`**; falta comprobarlo con ROS real (ver `marcos_y_reset_pose.md`).
 6. **Diagnóstico:** `diagnostico_roscar.recolectar` y `prueba_movimiento.py` ya usan `rclpy` y nunca se ejecutaron.
 
 ## 8. Decisiones de diseño que conviene no deshacer

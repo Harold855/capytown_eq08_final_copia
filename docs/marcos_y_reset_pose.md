@@ -61,6 +61,42 @@ Diseño defensivo (umbrales provisionales y ajustables):
 
 `PoseDock.error` da `(m, °)` respecto a la cruz, `en_tolerancia` es la condición del acople (≤ 4 cm **y** ≤ 6°) y `a_contrato()` da `dx`, `dy` en m y `dth` en grados, igual que la `solicitud`. `desplazamiento_odom_m` es lo que se movió la odometría desde el último reset: **es una distancia, no una incertidumbre calculada**, pero sirve para decidir cuánto confiar (en simulación, una odometría que avanza 5 % de más acumula ≈ 5 mm en 10 cm, y un nuevo reset con el tag lo elimina).
 
+## Adaptador ROS 2 (`carrito/nodos/nodo_reset_pose.py`)
+**Estado: escrito y probado solo contra un sustituto mínimo de `rclpy`** (`tests/carrito/test_nodo_reset_pose.py`). Eso prueba el cableado (parámetros, suscripciones, servicio, TF), no que la API real de ROS 2 esté bien usada: **nunca se ejecutó con ROS**. La lógica está en `gestor_reset.py` (Python puro, 19 pruebas) y el nodo es delgado.
+
+Interfaz (los nombres son **nuestros**, provisionales hasta que el curso publique la plantilla; todos son parámetros salvo el servicio):
+
+| Qué | Nombre por defecto | Tipo | Nota |
+|---|---|---|---|
+| entrada | `/odom` | `nav_msgs/Odometry` | marcos esperados `odom` → `base_link`; si no coinciden se descarta |
+| entrada | `/tag/pose` | `geometry_msgs/PoseStamped` | pose del tag en el sistema óptico de la cámara; se supone que solo llega si el tag fue aceptado y con la hora de captura |
+| entrada | `/pit/dock` | `std_msgs/Int32` | estación actual (1 a 4), la fija la máquina del pit |
+| servicio | `/reset_pose/aplicar` | `std_srvs/Trigger` | aplica el reset con el último tag; `message` trae un JSON con el motivo |
+| salida | TF `map` → `odom` | — | solo después del primer reset aceptado; **debe ser el único publicador de esta transformación** |
+| salida | `/reset_pose/estado` | `std_msgs/String` | JSON con el estado, tras cada llamada al servicio |
+
+Cómo evita los problemas conocidos de la odometría (retardo de 0.5–0.65 s medido en RC-1):
+- No usa "la última odometría" sino la **interpolada en el instante de la medición** (`retardo_odom_s` la desplaza) y exige que el robot haya estado quieto en la ventana previa (`ventana_quieto_s`, 0.3 s). Con la odometría retrasada 0.5 s y `retardo_odom_s = 0`, un robot que ya se detuvo se rechaza como "en movimiento" (`ROBOT_NO_QUIETO`); con 0.5 se acepta (hay una prueba de cada caso).
+- Si la odometría aún no llegó hasta ese instante responde `ODOM_INSUFICIENTE`: **el servicio no espera, quien lo llama debe reintentar** a los pocos décimos de segundo.
+- Otros motivos: `SIN_TAG`, `TAG_VIEJO` (más de `edad_max_tag_s` = 1 s), `TAG_FUTURO`, `ESTACION_INVALIDA`, `ODOM_NO_CUBRE`, y los del reset (`ROBOT_NO_QUIETO`, `SALTO_EXCESIVO`, `FUERA_DE_DOCK`).
+- Sin referencia no se publica TF; con una referencia vieja se sigue publicando la última (un rechazo no la cambia).
+
+Arranque (fallará con un mensaje claro si falta el montaje medido):
+```bash
+cd <repositorio> && python3 -m carrito.nodos.nodo_reset_pose --ros-args -p marcos_yaml:=carrito/config/marcos.yaml
+ros2 service call /reset_pose/aplicar std_srvs/srv/Trigger
+ros2 run tf2_ros tf2_echo map odom
+```
+Los parámetros decimales se pasan con punto decimal (`-p retardo_odom_s:=0.5`, no `0`): ROS rechaza un entero para un parámetro de tipo real.
+
+**Qué hay que comprobar en el robot** (el sustituto no lo puede garantizar):
+1. Los marcos reales de `/odom` (`child_frame_id` puede ser `base_footprint`; parámetro `base_frame`).
+2. Si las marcas de tiempo de `/odom` están en el mismo reloj que las del tag (el micro-ROS puede tener su propio reloj): si no, `odom_sello_llegada:=true` y `tag_sello_llegada:=true` usan la hora de llegada.
+3. El retardo real de `/odom` en este robot (`retardo_odom_s`).
+4. Que nadie más publique `map` → `odom` (`ros2 topic info /tf -v`).
+5. Que exista un nodo de cámara que publique `/tag/pose` con ese formato: **hoy no existe**. Para ensayar el nodo antes se puede publicar a mano un `PoseStamped`.
+6. Los QoS: las suscripciones usan `qos_profile_sensor_data` (aceptan publicadores confiables y *best effort*).
+
 ## Resultados en simulación
 - Escena física en 3D (cámara con montaje e inclinación, tag con altura distinta): la conversión recupera la pose a 2 mm y 0.2° en la zona de acople (±4 cm y ±6°), y a 1e-9 sin inclinación.
 - Del píxel a la pose en el dock (24 poses renderizadas con distorsión de lente, corregida, y montaje **conocido**): posición p95 0.35 cm y máximo 0.46 cm; ángulo p95 0.44° y máximo 0.72°.
@@ -69,6 +105,6 @@ Diseño defensivo (umbrales provisionales y ajustables):
 
 ## Lo que falta
 1. Medir el montaje y la posición del tag (arriba). Sin esto no hay pose en el dock.
-2. El adaptador ROS 2: publicar `map → odom` desde `ResetPose.map_odom` y leer `/odom` con su marca de tiempo (sin verificar en el robot).
+2. Probar el adaptador ROS 2 con ROS real (ver su sección) y escribir el nodo de cámara que publique `/tag/pose`.
 3. Decidir con el docente el marco del dock y si el reset debe ocurrir antes o después de la segunda medición del pit (README de referencia §15).
 4. Con la cámara real, cuánto se aparta la medición de estas cifras (iluminación, foco, calibración).

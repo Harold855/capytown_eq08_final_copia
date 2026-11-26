@@ -1,0 +1,6 @@
+# Dependencias para probar AprilTag sin robot (simulacion/apriltag_sintetico.py, tests/vision).
+# Instalar con:  bash scripts/preparar_entorno.sh --vision
+# Es el mismo conjunto que vendor/granprix/estacion/herramientas/requirements.txt.
+opencv-python-headless>=4.8   # >=4.7 trae cv2.aruco con los diccionarios AprilTag; "headless" basta (sin ventanas)
+numpy
+pupil-apriltags               # librería nativa: aborta con otras familias (tag25h9) mezcladas en un proceso; el reto usa tag36h11

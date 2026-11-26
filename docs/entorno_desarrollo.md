@@ -23,6 +23,7 @@ Las pruebas heredadas de RC-0 (`scripts/historicos/rc0/test`) se corren aparte: 
 Pide Python 3.12+ y un broker MQTT (Mosquitto).
 ```bash
 bash scripts/preparar_entorno.sh --pc-race      # instala vendor/granprix/pc-race en modo editable
+bash scripts/preparar_entorno.sh --vision       # OpenCV + pupil-apriltags: probar AprilTag sin robot (docs/apriltag_sin_robot.md)
 source .venv/bin/activate
 mosquitto -v                                     # en otra terminal (apt install mosquitto, o la instalación de Windows)
 pc-race                                          # tablero del juez en http://127.0.0.1:8080

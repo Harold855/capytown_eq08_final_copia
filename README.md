@@ -2,7 +2,7 @@
 
 **Proyecto final de Robótica – CapyTown**
 
-> **Estado (26-nov-2026):** hay lógica en Python y 375 pruebas automáticas sin robot. **Nada se ha ejecutado todavía contra el ROSCar, un JetCobot, una cámara real, ROS 2 ni un broker real.** Detalle en [`docs/desarrollo_realizado.md`](docs/desarrollo_realizado.md).
+> **Estado (26-nov-2026):** hay lógica en Python y 417 pruebas automáticas sin robot. **Nada se ha ejecutado todavía contra el ROSCar, un JetCobot, una cámara real, ROS 2 ni un broker real.** Detalle en [`docs/desarrollo_realizado.md`](docs/desarrollo_realizado.md).
 > **Precedencia de fuentes:** (1) lo que el docente indique por escrito; (2) su repositorio [`codeplai/GranPrix`](https://github.com/codeplai/GranPrix); (3) el HTML oficial.
 
 ## Equipo
@@ -93,14 +93,15 @@ Bono: +1 por odometría visual documentada (sin pasar de 20). Rige la rúbrica d
 | Estrategia de cambio de la estación | Hecha con brazo simulado |
 | Configuración YAML y contrato MQTT | Hechos; verificados contra el contrato del docente |
 | Visión: medición del AprilTag y calibración de la cámara | Hechas con una cámara sintética |
-| Nodos ROS 2, máquina de estados del pit, reset de pose y tablero web | **Pendientes** |
+| Conversión cámara → dock y reset de pose | Hechos en Python puro; simulados (falta medir el montaje de la cámara) |
+| Nodos ROS 2, máquina de estados del pit y tablero web | **Pendientes** |
 | Pruebas con los robots reales | **Ninguna todavía** |
 
 ## Cómo empezar
 
 ```bash
 bash scripts/preparar_entorno.sh --vision   # entorno virtual y dependencias
-bash scripts/ejecutar_pruebas.sh            # 375 pruebas; "TODO OK" si pasan
+bash scripts/ejecutar_pruebas.sh            # 417 pruebas; "TODO OK" si pasan
 ```
 
 Detalle del entorno en [`docs/entorno_desarrollo.md`](docs/entorno_desarrollo.md).
@@ -112,7 +113,7 @@ Detalle del entorno en [`docs/entorno_desarrollo.md`](docs/entorno_desarrollo.md
 - `vision/`: medición del AprilTag y calibración de la cámara. `integracion/`: configuración MQTT. `comun/`, `geometria_dock/`: utilidades compartidas.
 - `simulacion/`: modelo del simulador del HTML, barridos de parámetros e imágenes sintéticas.
 - `scripts/`: entorno, pruebas, diagnósticos (ROSCar, JetCobot), calibración de cámara y copias históricas de RC-0 y RC-1.
-- `tests/`: 375 pruebas propias. `experimentos/`: pruebas de laboratorio, separadas de la evidencia oficial.
+- `tests/`: 417 pruebas propias. `experimentos/`: pruebas de laboratorio, separadas de la evidencia oficial.
 - `vendor/granprix/`: copia fija del repositorio del docente, **sin modificar**.
 - `docs/`: documentación; el índice está en [`docs/README.md`](docs/README.md).
 

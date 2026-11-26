@@ -6,7 +6,7 @@
 
 ## Qué entrega y qué no
 - **Pose en el sistema de la cámara:** `x` a la derecha, `y` hacia abajo, `z` hacia adelante, en **metros**; `dth` en **grados** (0 = tag de frente). Es la convención de la herramienta del docente.
-- **NO está en el marco del dock.** Falta el montaje de la cámara en el carrito y `dock_frames.yaml` (el docente no lo ha publicado). Hasta entonces esta pose no es `PoseDock`.
+- **NO está en el marco del dock.** Falta el montaje de la cámara en el carrito y `dock_frames.yaml` (el docente no lo ha publicado). Para pasarla a pose del robot en el dock y en el mapa: `scripts/roscar_v01/pose_dock.py` ([`marcos_y_reset_pose.md`](marcos_y_reset_pose.md)); necesita el montaje de la cámara medido.
 - **Nunca entrega una pose conjeturada.** Una medición solo la lleva si el tag es único, tiene la calidad pedida y, al agregar, es estable entre cuadros. Si no, la pose es `null` y viene el motivo.
 - La pose es en la **resolución de la calibración**: una imagen de otro tamaño es un error, no una medición.
 

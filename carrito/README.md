@@ -101,7 +101,7 @@ Lectura: en este modelo 0.35 es un buen compromiso y no hay motivo para cambiarl
 
 **Criterio de convergencia** (provisional): al menos 4 actualizaciones usadas y diferencia máxima entre ellas < 0.01. En 300 semillas simuladas no declaró convergencia falsa y la declara entre 8 y 12 pits.
 
-**Lo que no cubre:** la medición de poses (tag), el reset de pose y la secuencia del pit son de otros módulos; aquí se asume que las poses llegan ya medidas y coherentes entre sí. No hay adaptador ROS ni se escribe el archivo de estado automáticamente: lo decide el nodo que use este módulo.
+**Lo que no cubre:** la medición de poses (tag) es de `vision/`, la conversión a pose en el dock y el reset de pose están en `marcos.py` y `reset_pose.py` (ver `docs/marcos_y_reset_pose.md`) y la secuencia del pit es de otro módulo; aquí se asume que las poses llegan ya medidas y coherentes entre sí. No hay adaptador ROS ni se escribe el archivo de estado automáticamente: lo decide el nodo que use este módulo.
 
 ## Verificación
 - **Equivalencia con el HTML oficial:** `simulacion/modelo_granprix.py` usa este planificador y reproduce el `simulate()` original (mismas semillas) en 18 casos y 288 llegadas, con una tolerancia de 1e-9 (`tests/carrito/test_equivalencia_html.py`). La referencia son salidas del JavaScript original ejecutado con Node.js (`tests/carrito/referencia_html.json`).

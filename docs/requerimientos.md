@@ -21,7 +21,7 @@ Cada requisito indica su fuente, qué parte del código lo cubre, qué prueba lo
 | RQ-11 | Error posterior menor que el anterior en ≥ 70 % de las paradas | Ref. §13 (Pit) | `evaluar_reduccion` | `test_calibracion.py` | Verificado (cálculo). **Abierto:** cómo cuentan las paradas ya dentro de tolerancia |
 | RQ-12 | Escalas convergentes | Ref. §13 (Pit) | `EstimadorEscalas.convergio()` (4 actualizaciones, diferencia < 0.01) | `test_calibracion.py` | Simulado. Umbral provisional |
 | RQ-13 | Orden del pit: medir → acoplar → solicitar → resultado → medir → reset → recalibrar | Ref. §8, doc. 03 | Piezas sueltas (ver `arquitectura.md` §6) | — | **Pendiente** (máquina de estados) |
-| RQ-14 | Reset de pose (`map → odom`) con la pose medida | Ref. §8 | — | — | **Pendiente** |
+| RQ-14 | Reset de pose (`map → odom`) con la pose medida | Ref. §8 | `marcos.py` (cámara → dock) y `ResetPose` | `test_marcos.py`, `test_reset_pose.py`, `test_marcos_imagen.py` | Simulado. **Falta** medir el montaje de la cámara y el publicador del TF |
 | RQ-15 | Cada parada guarda el error antes y después | Ref. §8 | `EstimadorEscalas.registros` y `exportar_csv` guardan las razones y escalas; no hay registro de errores del acople | `test_calibracion.py` | Parcial |
 
 ## 2. Comunicación y contrato

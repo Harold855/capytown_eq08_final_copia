@@ -17,7 +17,7 @@ Qué hay y cuándo leerlo. Los documentos están agrupados por lo que se necesit
 | Documento | Qué contiene |
 |---|---|
 | [`entorno_desarrollo.md`](entorno_desarrollo.md) | PC, Race Control, WSL2/ROS 2, Pi5 y Jetson: qué está verificado |
-| [`configuracion.md`](configuracion.md) | Los cinco archivos YAML, qué valores son reales, supuestos o placeholders, y qué no se creó y por qué |
+| [`configuracion.md`](configuracion.md) | Los seis archivos YAML, qué valores son reales, supuestos o placeholders, y qué no se creó y por qué |
 
 ## Para el día de laboratorio con el ROSCar
 | Documento | Qué contiene |
@@ -34,6 +34,7 @@ Qué hay y cuándo leerlo. Los documentos están agrupados por lo que se necesit
 | [`apriltag_sin_robot.md`](apriltag_sin_robot.md) | Qué se puede probar sin robot, cifras de precisión, el efecto de la calibración y de la distorsión |
 | [`procedimiento_calibracion_camara.md`](procedimiento_calibracion_camara.md) | Calibrar la focal con regla y tag (primero) y validarla fuera del eje |
 | [`procedimiento_calibracion_damero.md`](procedimiento_calibracion_damero.md) | Calibrar con damero, incluida la distorsión (solo si lo anterior falla fuera del eje) |
+| [`marcos_y_reset_pose.md`](marcos_y_reset_pose.md) | Pasar la pose del tag a pose del robot en el dock y en el mapa, reset de pose, cómo medir el montaje de la cámara y cuánto pesa cada error |
 | [`procedimiento_medir_tag.md`](procedimiento_medir_tag.md) | Medir la pose del tag con la cámara calibrada, motivos de rechazo y cómo validarla con regla y transportador |
 
 ## Para el día de laboratorio con el JetCobot

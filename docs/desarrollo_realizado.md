@@ -24,14 +24,15 @@ Otros documentos: arquitectura en [`arquitectura.md`](arquitectura.md), requisit
 | ROSCar: planificador | `carrito/granprix_carrito/planificador.py`, `docks.py` | Verificado; equivale al `simulate()` del HTML a 1e-9 |
 | ROSCar: ejecutor de movimiento | `carrito/granprix_carrito/ejecutor.py` | Simulado (reloj falso y robot ideal) |
 | ROSCar: estimadores `cd` y `ca` | `carrito/granprix_carrito/calibracion.py` | Simulado |
-| Configuración YAML | 5 archivos + cargador estricto `comun/yaml_estricto.py` | Verificado |
+| ROSCar: cámara → dock y reset de pose | `carrito/granprix_carrito/marcos.py`, `reset_pose.py`, `config/marcos.yaml`, `scripts/roscar_v01/pose_dock.py` | Simulado; **falta medir el montaje de la cámara** |
+| Configuración YAML | 6 archivos + cargador estricto `comun/yaml_estricto.py` | Verificado |
 | MQTT | `integracion/configuracion/mqtt.yaml`, `mqtt_config.py`, `scripts/roscar_v01/mensajes_contrato.py` | Verificado contra el contrato del docente; **sin broker real** |
 | Estación (JetCobot) | `estacion/` estrategia, roles, compensación, poses, brazo simulado; `scripts/jetcobot_v01/` | Simulado; **nunca contra un brazo** |
 | Visión sin robot | `vision/`, `simulacion/*sintetico.py`, calibración con regla y con damero, `medir_tag.py` | Simulado (cámara sintética); **nunca con la cámara real** |
-| Pruebas | 375 propias en 8 carpetas | Verificado |
+| Pruebas | 417 propias en 8 carpetas | Verificado |
 | Entorno | `scripts/preparar_entorno.sh`, `requirements-*.txt` | Verificado en Linux, Python 3.13 |
 
-**Lo que NO existe:** nodos ROS 2 del carrito (`control_odometria`, `camara_apriltag`, `maquina_pit`), el adaptador ROS 2 del ejecutor, el reset de pose, la máquina de estados del pit, el tablero web, la cinemática y manipulación reales del brazo, y cualquier medición física. La lógica de arriba está lista para conectarse a ellos, pero conectarla es trabajo pendiente.
+**Lo que NO existe:** nodos ROS 2 del carrito (`control_odometria`, `camara_apriltag`, `maquina_pit`), el adaptador ROS 2 del ejecutor y del reset de pose, la máquina de estados del pit, el tablero web, la cinemática y manipulación reales del brazo, y cualquier medición física. La lógica de arriba está lista para conectarse a ellos, pero conectarla es trabajo pendiente.
 
 ## 2. Línea de tiempo (commits de la rama)
 
@@ -81,7 +82,7 @@ scripts/
   camara/                      calibrar_focal.py (regla), calibrar_damero.py y medir_tag.py
   historicos/                  copias de RC-0 y RC-1 (referencia, sin modificar)
   preparar_entorno.sh, ejecutar_pruebas.sh
-tests/                         una carpeta por paquete (375 pruebas)
+tests/                         una carpeta por paquete (417 pruebas)
 experimentos/                  plantillas de evidencia (vacío de mediciones reales)
 requirements-dev.txt, requirements-vision.txt
 ```
@@ -119,13 +120,21 @@ requirements-dev.txt, requirements-vision.txt
 - `evaluar_reduccion`: fracción de paradas con error posterior menor que el previo (umbral 70 % de la evaluación oficial). Cómo cuenta la rúbrica las paradas ya dentro de tolerancia **no está confirmado**; la función informa ambas versiones.
 - `simulacion/barrido_alpha.py` compara valores de α con el modelo del HTML: α = 0.35 es el mejor compromiso (ver §5).
 
+### 4.5 bis ROSCar: cámara → dock y reset de pose (`marcos.py`, `reset_pose.py`)
+- `marcos.py` convierte la pose del tag (sistema de la cámara, la que entrega `medir_tag.py`) en pose del robot en el dock `(dx, dy, dth)` y en el mapa, componiendo transformaciones 2D con el montaje de la cámara y la posición del tag en el dock. `montaje_desde_referencia` obtiene el montaje de una medición con el robot sobre su marca.
+- `ResetPose` calcula `map → odom` y `pose_mapa(odom)`; exige inicialización explícita, robot quieto, salto acotado y pose cerca del dock, y un rechazo no cambia su estado.
+- `scripts/roscar_v01/pose_dock.py convertir | montaje` lo expone por línea de comandos sobre la salida de `medir_tag.py`.
+- **Simulado:** escena física 3D independiente (2 mm y 0.2° en la zona de acople) y del píxel a la pose (p95 0.35 cm y 0.44°, con el montaje conocido). Los errores del montaje pasan 1 a 1 a la pose.
+- **Falta medir** el montaje de la cámara y la posición del tag en el dock (`marcos.yaml` falla mientras haya `null`), y el publicador ROS 2 del TF. Detalle: [`marcos_y_reset_pose.md`](marcos_y_reset_pose.md).
+
 ### 4.6 Configuración YAML (`docs/configuracion.md`)
-Cinco archivos, cada uno con su lector validado, más un cargador estricto compartido (`comun/yaml_estricto.py`):
+Seis archivos, cada uno con su lector validado, más un cargador estricto compartido (`comun/yaml_estricto.py`):
 
 | Archivo | Lo lee |
 |---|---|
 | `carrito/config/movimiento.yaml` | `carrito.granprix_carrito.configuracion.cargar_movimiento` |
 | `carrito/config/calibracion.yaml` | `EstimadorEscalas.cargar` / `cargar_carrito` |
+| `carrito/config/marcos.yaml` | `carrito.granprix_carrito.marcos.cargar_marcos` |
 | `estacion/config/estacion.yaml` | `app_equipo.configuracion.cargar_estacion` |
 | `estacion/config/poses.plantilla.yaml` | `app_equipo.posiciones.cargar` |
 | `integracion/configuracion/mqtt.yaml` | `integracion.mqtt_config.cargar_mqtt` |
@@ -200,15 +209,15 @@ bash scripts/ejecutar_pruebas.sh                   # "TODO OK" si pasan
 
 | Carpeta | Pruebas | Cubre |
 |---|---|---|
-| `tests/roscar_v01` | 40 | v0.1, registro, análisis, diagnóstico con `--simular` |
+| `tests/roscar_v01` | 48 | v0.1, registro, análisis, diagnóstico con `--simular` |
 | `tests/integracion` | 20 | mensajes y `mqtt.yaml` contra el contrato del docente (necesita `pydantic`) |
 | `tests/geometria_dock` | 6 | transformaciones 2D |
 | `tests/estacion` | 38 | estrategia, compensación, poses, configuración |
 | `tests/jetcobot_v01` | 11 | diagnóstico y cronómetro |
-| `tests/carrito` | 97 | docks, planificador, equivalencia con el HTML, ejecutor, estimadores, configuración |
+| `tests/carrito` | 127 | docks, planificador, equivalencia con el HTML, ejecutor, estimadores, configuración |
 | `tests/comun` | 15 | cargador YAML estricto |
-| `tests/vision` | 148 | AprilTag sintético, calibración con regla y con damero, medición con `medir_tag` (≈ 45 s; se omiten si falta OpenCV) |
-| **Total propias** | **375** | |
+| `tests/vision` | 152 | AprilTag sintético, calibración con regla y con damero, medición con `medir_tag` (≈ 45 s; se omiten si falta OpenCV) |
+| **Total propias** | **417** | |
 
 Además, las del docente: `pc-race` (126, en el entorno con `--pc-race`) y la herramienta AprilTag (24 con `-k "not tag25h9 and not tag16h5"`).
 
@@ -241,7 +250,7 @@ Preguntas para el docente que siguen abiertas (`referencia_del_reto.md` §15 las
 |---|---|
 | 1.1 Diagnóstico del ROSCar | Herramientas listas (`diagnostico_roscar`, `preflight`, registro, análisis, procedimiento). **Pendiente:** correrlas en el robot |
 | 1.2 Planificación y ejecución | Planificador y ejecutor hechos (simulados). **Pendiente:** adaptador ROS 2, medir pausa y asentamiento |
-| 1.3 Visión y localización | Medición del tag (`medir_tag.py`) y calibración de cámara hechas (simuladas). **Pendiente:** nodo de cámara, `/tag/pose`, reset de pose, marcos |
+| 1.3 Visión y localización | Medición del tag, calibración de cámara, conversión cámara → dock y reset de pose hechos (simulados). **Pendiente:** medir el montaje de la cámara, nodo de cámara, `/tag/pose` y el TF `map → odom` |
 | 1.4 Acople y calibración adaptativa | Lógica del acople y estimadores `cd`/`ca` hechos. **Pendiente:** la máquina de estados del pit |
 | 1.5 Autonomía y seguridad | Condiciones de aborto del ejecutor. **Pendiente:** verificar `twist_mux` y la parada |
 | 1.6 Tablero web y registro | Sin iniciar (solo constructores de mensajes y plantillas de evidencia) |
@@ -250,7 +259,7 @@ Preguntas para el docente que siguen abiertas (`referencia_del_reto.md` §15 las
 | 2.4 Compensación de la cuna | Hecha con marcos supuestos |
 | 2.5 Estrategia de cambio / 2.6 Seguridad | Hechas y simuladas; falla cerrada |
 | 3.1 Arquitectura y contrato | Configuración MQTT y mensajes verificados contra el docente |
-| 3.2 Simulación y pruebas independientes | Entorno, 375 pruebas, modelo del HTML |
+| 3.2 Simulación y pruebas independientes | Entorno, 417 pruebas, modelo del HTML |
 | 3.3 Integración del pit / 3.4 de la carrera | Sin iniciar (existe el tiempo ideal de una vuelta) |
 | 3.5 Experimentación y predicción | Herramientas listas (modelo del HTML, barridos). **Pendiente:** predicción firmada con parámetros medidos |
 | 3.6 Evidencias / 3.7 Carrera | Plantillas; sin evidencia real |
@@ -269,7 +278,7 @@ Preguntas para el docente que siguen abiertas (`referencia_del_reto.md` §15 las
 **Sin robot, por prioridad:**
 1. Adaptador ROS 2 del ejecutor (Twist, `/odom`, reloj) y de `diagnostico_roscar`.
 2. Máquina de estados del pit (medir → acoplar → solicitar → esperar resultado → medir → reset → recalibrar, con reintentos): usa lo ya hecho.
-3. Reset de pose (`map → odom`) con la pose medida, y el nodo de cámara que use `CamaraTag` y publique `/tag/pose`.
+3. Adaptadores ROS 2: el nodo de cámara que use `CamaraTag` y publique `/tag/pose`, y el publicador del TF `map → odom` desde `ResetPose`.
 4. Prueba de integración contra `pc-race` con un Mosquitto real.
 5. Fusionar *waypoints* de la estación una vez medidos los tiempos reales.
 6. Predicción firmada con el modelo del HTML y los parámetros medidos.

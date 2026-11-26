@@ -1,10 +1,11 @@
 # Configuraciones YAML
 
-Cuatro archivos de configuración, todos con el mismo cargador estricto (`comun/yaml_estricto.py`). Cada clave que aparece en un YAML está leída y validada por código: **una clave que ninguna función lee no existe**, para que nadie edite algo creyendo que cambia el comportamiento.
+Seis archivos de configuración, todos con el mismo cargador estricto (`comun/yaml_estricto.py`). Cada clave que aparece en un YAML está leída y validada por código: **una clave que ninguna función lee no existe**, para que nadie edite algo creyendo que cambia el comportamiento.
 
 | Archivo | Lo lee | Qué fija | Estado de los valores |
 |---|---|---|---|
 | `carrito/config/movimiento.yaml` | `carrito.granprix_carrito.configuracion.cargar_movimiento` | velocidades de referencia y límites, parámetros del ejecutor | límites = reto; referencias = HTML/RC-1; `pausa_s` y `asentamiento_s` = **placeholders a medir** |
+| `carrito/config/marcos.yaml` | `carrito.granprix_carrito.marcos.cargar_marcos` | montaje de la cámara en el robot, posición del tag en el dock, umbrales de "cerca del dock" | **`null`: se miden en el laboratorio**; la carga falla hasta entonces |
 | `carrito/config/calibracion.yaml` | `EstimadorEscalas.cargar` / `cargar_carrito` | robot, escalas `cd`/`ca` iniciales, perfil `v`/`ω`, parámetros del estimador | escalas **1.0 = sin caracterizar**; `alpha` 0.35 = referencia del HTML |
 | `estacion/config/estacion.yaml` | `app_equipo.configuracion.cargar_estacion` | tolerancias, tope de tiempo, geometría del montaje | tolerancias = reto; geometría = **supuestos** hasta medir |
 | `estacion/config/poses.plantilla.yaml` | `app_equipo.posiciones.cargar` (copia `poses_rolN.yaml`) | las 8 poses de trabajo de un rol | todo `null`: **se enseñan en el laboratorio** |
@@ -39,7 +40,7 @@ Quién necesita qué: el carrito usa `movimiento` y `calibracion`; la estación 
 ## Lo que NO se creó y por qué
 | Archivo previsto en la división | Motivo |
 |---|---|
-| `dock_frames.yaml` | no existe el del docente y la división dice no fijar un esquema ficticio. Los supuestos de marcos quedan marcados en `estacion.yaml` |
+| `dock_frames.yaml` | no existe el del docente y la división dice no fijar un esquema ficticio. Los supuestos de marcos quedan marcados en `estacion.yaml`; lo que sí se puede medir (montaje de la cámara y posición del tag en el dock) va en `marcos.yaml` |
 | `camara.yaml` (semilla editable) | no hay valores que inventar. Existe `camara_calibrada.yaml`, un **resultado** que generan `scripts/camara/calibrar_focal.py` (regla y tag) o `scripts/camara/calibrar_damero.py` (damero, con distorsión) y lee `vision.calibracion_focal.cargar_camara` (procedimientos en `docs/procedimiento_calibracion_camara.md` y `docs/procedimiento_calibracion_damero.md`); queda en la carpeta del experimento, no en `config/` |
 | `almacenes.yaml`, `manipulacion.yaml`, `estacion.yaml` del JetCobot (inventario) | dependen de medir el montaje real y de la tabla de alcance; sus datos serían inventados |
 | `caracterizacion.yaml`, `metadata.yaml` | son **resultados** de los experimentos, no configuración: los genera cada experimento |

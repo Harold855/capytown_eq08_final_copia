@@ -66,6 +66,8 @@ carrito.granprix_carrito
   ejecutor         -> planificador
   calibracion      -> planificador, comun, geometria_dock
   configuracion    -> calibracion, ejecutor, planificador, comun
+  marcos           -> docks, comun, geometria_dock       (cámara -> dock; cargar_marcos)
+  reset_pose       -> geometria_dock                     (map -> odom)
 
 app_equipo (estacion/src)
   puerto           (sin dependencias)
@@ -119,11 +121,11 @@ Orden del curso: medir → acoplar → solicitar → esperar resultado → medir
 
 | Paso | Función existente | Falta |
 |---|---|---|
-| medir la pose | `vision.medicion.CamaraTag.medir` y `agregar` (o `scripts/camara/medir_tag.py`) | nodo de cámara y `/tag/pose`; marco del dock |
+| medir la pose | `vision.medicion.CamaraTag.medir` y `agregar` (o `scripts/camara/medir_tag.py`), y `marcos.desde_medicion` (o `pose_dock.py`) | nodo de cámara y `/tag/pose`; montaje medido; marco del dock del docente |
 | ¿está dentro de tolerancia? | `acople_valido`, `error_acople` | — |
 | corregir | `planificar_acople` + `EjecutorMovimiento` | orquestarlo con reintentos |
 | solicitud / resultado | constructores de `scripts/roscar_v01/mensajes_contrato.py`, tópicos de `mqtt.yaml` | publicarlos vía `puente_mqtt` |
-| reset de pose | — | **todo** |
+| reset de pose | `marcos.pose_robot` y `ResetPose` (ver `marcos_y_reset_pose.md`) | medir el montaje de la cámara; publicar el TF `map → odom` |
 | recalibrar | `EstimadorEscalas.observar` | alimentarlo con la pose previa al acople |
 
 El estimador necesita la pose medida **antes** de cualquier acople, y el comando **realmente enviado**: de otro modo converge a un valor sesgado.
@@ -133,7 +135,8 @@ El estimador necesita la pose medida **antes** de cualquier acople, y el comando
 2. **Cámara → ROS 2:** un nodo que use `CamaraTag` (corrige la distorsión, filtra por calidad y agrega cuadros) y publique `/tag/pose`.
 3. **Pit → MQTT:** publicar `solicitud` y `evento` y leer `resultado` y `turno` con los tópicos de `mqtt.yaml`, a través de `puente_mqtt` (del curso).
 4. **Brazo:** implementar `BrazoJetCobot` según la firma que publique el docente y ajustar `puerto.py`.
-5. **Diagnóstico:** `diagnostico_roscar.recolectar` y `prueba_movimiento.py` ya usan `rclpy` y nunca se ejecutaron.
+5. **TF `map → odom`:** un publicador que use `ResetPose.map_odom` y lea `/odom` con su marca de tiempo (ver `marcos_y_reset_pose.md`).
+6. **Diagnóstico:** `diagnostico_roscar.recolectar` y `prueba_movimiento.py` ya usan `rclpy` y nunca se ejecutaron.
 
 ## 8. Decisiones de diseño que conviene no deshacer
 - **`comandado` es lo enviado, no lo nominal** (hay una prueba que lo documenta con números).

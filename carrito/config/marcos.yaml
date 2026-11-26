@@ -1,0 +1,22 @@
+# Marcos para convertir la pose del tag (sistema de la cámara) a pose del robot en el dock y en el mapa.
+# Lo lee carrito/granprix_carrito/marcos.py (cargar_marcos). Mientras haya un null, la carga falla: hay que medir.
+# Convención: x adelante, y a la izquierda, yaw antihorario. Marco del dock (supuesto): origen en el centro del dock,
+# x en el rumbo de llegada, y a la izquierda.
+version: 1
+
+camara_en_robot:        # respecto del centro del robot (base_link)
+  x_m: null
+  y_m: null
+  yaw_deg: null
+  inclinacion_deg: 0.0  # positivo = cámara mirando hacia abajo; medir con inclinómetro
+
+tag_en_dock:            # centro del tag en el marco del dock
+  x_m: null
+  y_m: null
+  yaw_deg: 0.0          # 0 = tag de frente al carrito que llega
+
+por_dock: {}            # opcional: sustituye tag_en_dock por estación, p. ej. {E2: {x_m: 0.3, y_m: 0.0, yaw_deg: 0.0}}
+
+cerca_del_dock:         # una pose más lejos que esto del centro del dock se rechaza (tag mal leído o dock equivocado)
+  max_m: 0.30
+  max_deg: 45.0

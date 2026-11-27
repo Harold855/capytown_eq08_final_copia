@@ -2,6 +2,9 @@
 
 **Proyecto final de Robótica – CapyTown**
 
+> **Estado (27-nov-2026):** hay lógica en Python y 834 pruebas automáticas sin robot. **Nada se ha ejecutado todavía contra el ROSCar, un JetCobot, una cámara real, ROS 2 ni un broker real.** Detalle en [`docs/desarrollo_realizado.md`](docs/desarrollo_realizado.md); el plan para el primer día con el robot, en [`docs/guion_laboratorio.md`](docs/guion_laboratorio.md).
+> **Precedencia de fuentes:** (1) lo que el docente indique por escrito; (2) su repositorio [`codeplai/GranPrix`](https://github.com/codeplai/GranPrix); (3) el HTML oficial.
+
 ## Equipo
 
 | Número | Integrante | Parte realizada | Rol asignado |

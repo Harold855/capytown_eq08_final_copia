@@ -161,13 +161,20 @@ def ensayo(a, cfg, mov, escalas):
     return terminar(res, a.estacion, CalibradorTramo(_estimador(escalas)), a.csv)
 
 
+def comunes(p, suprimir=False):
+    """Opciones válidas antes y después del subcomando; en el subcomando no pisan lo ya dado (SUPPRESS)."""
+    d = {'default': argparse.SUPPRESS} if suprimir else {}
+    p.add_argument('--acople', help='acople.yaml (por defecto el de carrito/config)', **d)
+    p.add_argument('--csv', type=Path, help='añade la parada a este CSV', **d)
+    p.add_argument('--sin-reversa', action='store_true', help='desactiva la marcha atrás aunque acople.yaml la permita', **d)
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split('\n')[0])
-    p.add_argument('--acople', help='acople.yaml (por defecto el de carrito/config)')
-    p.add_argument('--csv', type=Path, help='añade la parada a este CSV')
-    p.add_argument('--sin-reversa', action='store_true', help='desactiva la marcha atrás aunque acople.yaml la permita')
+    comunes(p)
     sub = p.add_subparsers(dest='modo', required=True)
     s = sub.add_parser('simular')
+    comunes(s, True)
     s.add_argument('--estacion', type=int, default=1, choices=(1, 2, 3, 4))
     s.add_argument('--dx', type=float, default=-0.06)
     s.add_argument('--dy', type=float, default=0.02)
@@ -176,6 +183,7 @@ def main(argv=None):
     s.add_argument('--ca', type=float, default=1.0)
     s.add_argument('--semilla', type=int, default=0)
     e = sub.add_parser('ensayo')
+    comunes(e, True)
     e.add_argument('--estacion', type=int, required=True, choices=(1, 2, 3, 4))
     e.add_argument('--marcos', default='carrito/config/marcos.yaml')
     e.add_argument('--ejecutar', action='store_true', help='sin esta opción solo calcula, no publica')

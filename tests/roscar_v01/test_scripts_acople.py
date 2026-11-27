@@ -57,6 +57,24 @@ class TestPruebaAcopleSimulada(unittest.TestCase):
             self.assertEqual(list(filas[0]), list(CAMPOS_PARADAS))
             self.assertEqual(filas[0]['exito'], 'True')
 
+    def test_las_opciones_comunes_valen_antes_y_despues_del_subcomando(self):
+        with tempfile.TemporaryDirectory() as d:
+            for i, orden in enumerate((('--csv', 'A', 'simular'), ('simular', '--csv', 'A'))):
+                ruta = str(Path(d) / f'{i}.csv')
+                rc, out, _ = correr(pa, *[ruta if x == 'A' else x for x in orden], '--dx', '-0.06')
+                self.assertEqual(rc, 0, msg=orden)
+                self.assertEqual(len(leer_csv(ruta)), 1)
+            rc, out, _ = correr(pa, 'simular', '--sin-reversa', '--dx', '0.07')                   # sobrepaso: sin reversa no se puede
+            self.assertEqual(rc, 1)
+            self.assertIn('GIRO_EXCESIVO', out)
+
+    def test_ensayo_acepta_las_opciones_comunes_despues_del_subcomando(self):
+        with self.assertRaises(SystemExit) as c, contextlib.redirect_stderr(io.StringIO()) as err:
+            pa.main(['ensayo', '--estacion', '2', '--ejecutar', '--csv', 'x.csv'])            # falta --zona-segura, pero ya no "unrecognized"
+        self.assertEqual(c.exception.code, 2)
+        self.assertNotIn('unrecognized', err.getvalue())
+        self.assertIn('zona-segura', err.getvalue())
+
     def test_un_robot_que_no_responde_da_codigo_1(self):
         rc, out, _ = correr(pa, 'simular', '--dx', '-0.10', '--cd', '0.01')    # casi no avanza
         self.assertEqual(rc, 1)

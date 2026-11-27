@@ -15,7 +15,7 @@ carrito/granprix_carrito/
 ├── adaptador_ros.py                        conexión con ROS 2 (rclpy solo dentro de _clase_nodo)
 ├── registro_experimental.py                evidencias de las pruebas de laboratorio
 └── tablero_extension/metricas.py           indicadores para el tablero
-carrito/nodos/                              nodo_reset_pose, camara_apriltag_node, tag_emulado (rclpy)
+carrito/nodos/                              nodo_reset_pose, camara_apriltag_node, tag_emulado, estacion_falsa (rclpy)
 carrito/config/                             movimiento, calibracion, marcos, marcos_sim, acople, mision (.yaml)
 evidencia/                                  verificar_evidencias.py, evidencia.yaml, archivos_falsos.py
 tablero/                                    panel.html/js/css y datos_simulados.py (prototipo)

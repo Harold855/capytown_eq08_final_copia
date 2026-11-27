@@ -1,0 +1,21 @@
+# SOLO PARA EL SIMULADOR RC-1 (tag_emulado.py). No es el montaje del robot real.
+# Cámara del simulador (yahboomcar_sim): 10 cm adelante del centro, 20.05° (0.35 rad) hacia abajo. El tag está a 28 cm de la
+# cámara en el dock (README de referencia §6), es decir a 0.38 m del centro del dock, de frente al carrito.
+version: 1
+
+camara_en_robot:
+  x_m: 0.10
+  y_m: 0.0
+  yaw_deg: 0.0
+  inclinacion_deg: 20.05
+
+tag_en_dock:
+  x_m: 0.38
+  y_m: 0.0
+  yaw_deg: 0.0
+
+por_dock: {}
+
+cerca_del_dock:
+  max_m: 0.30
+  max_deg: 45.0

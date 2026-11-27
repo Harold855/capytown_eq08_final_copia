@@ -1,0 +1,27 @@
+# Poses de trabajo del JetCobot para UN rol. Plantilla: copiar a poses_rolN.yaml y rellenar.
+# Lo lee app_equipo/posiciones.py (cargar). También acepta .json.
+#
+# Reglas (la carga falla cerrada si no se cumplen):
+#  - Cada pose es [x, y, z, rx, ry, rz] en MILÍMETROS y GRADOS (convención de pymycobot).
+#  - Se ENSEÑAN en el laboratorio con el carrito en su pose nominal; nunca se copian de otro día o brazo.
+#  - null = sin enseñar: la estrategia no se mueve (NO_CONFIGURADO). Si a un rol le falta una pose que
+#    necesita, la carga falla y dice cuáles.
+#  - Las listas de bandeja llevan exactamente 4 poses, una por pieza.
+#  - Sin valores por defecto: este archivo NO trae coordenadas inventadas.
+rol: 2            # 1 a 4: E1 carga A | E2 retira A y coloca B | E3 retira B y coloca C | E4 descarga C
+
+poses:
+  cuna_aprox: null       # sobre la cuna del carrito (todos los roles)
+  pose_libre: null       # brazo fuera de la zona de paso (todos los roles)
+  cuna_agarre: null      # roles que retiran: E2, E3, E4
+  recepcion_aprox: null  # roles que retiran: lista de 4 poses
+  recepcion_dejar: null  # roles que retiran: lista de 4 poses
+  cuna_dejar: null       # roles que colocan: E1, E2, E3
+  almacen_aprox: null    # roles que colocan: lista de 4 poses
+  almacen_agarre: null   # roles que colocan: lista de 4 poses
+  # Ejemplo del formato de una lista de bandeja (NO son coordenadas reales):
+  # almacen_aprox:
+  #   - [x, y, z, rx, ry, rz]
+  #   - [x, y, z, rx, ry, rz]
+  #   - [x, y, z, rx, ry, rz]
+  #   - [x, y, z, rx, ry, rz]

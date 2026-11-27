@@ -1,0 +1,35 @@
+# Misión del ROSCar: estaciones, vueltas, piezas, plazos y seguridad de nuestra lógica.
+# Lo lee carrito/granprix_carrito/mision.py (cargar_mision). Clave desconocida o repetida = error.
+# Origen:  [reto] regla oficial, no se sube  |  [propio] decisión nuestra, provisional  |  [medir] ajustar con el robot
+version: 1
+
+equipo: 8                  # [reto] eq08
+vueltas: 4                 # [reto] cuatro vueltas consecutivas
+
+# Orden del circuito (sentido antihorario) y piezas. `trae` = lo que lleva al llegar; `deja` = lo que se lleva al salir.
+# La cadena debe cerrarse: lo que deja una estación es lo que trae la siguiente (E4 deja vacío y E1 trae vacío).
+estaciones:
+  E1: {trae: null, deja: A}    # Largada: carga de pieza A
+  E2: {trae: A, deja: B}       # Pit 1: intercambio A -> B
+  E3: {trae: B, deja: C}       # Pit 2: intercambio B -> C
+  E4: {trae: C, deja: null}    # Meta: descarga de pieza C
+
+tiempos:
+  tanda_max_s: 720.0           # [reto] 12 min; pasado esto se detiene
+  pit_max_s: 10.0              # [reto] solo se mide y se cuenta (pits_lentos); no aborta
+  navegando_margen_s: 8.0      # [propio] sobre la duración comandada del tramo
+  midiendo_s: 4.0              # [propio] máximo esperando una medición válida del tag
+  acoplando_s: 20.0            # [propio] una corrección larga (error de 28 cm) tarda ~12 s; es mejor un pit lento que abortar
+  solicitando_s: 3.0           # [propio] esperando enlace y estación disponible
+  esperando_resultado_s: 15.0  # [propio] la estación tiene 8 s (estacion.yaml) + margen de comunicación
+  recalibrando_s: 6.0          # [propio]
+  saliendo_s: 3.0              # [propio]
+  medicion_post_s: 2.0         # [propio] segunda medición tras el intercambio; si falta se sigue con la última del acople
+  reset_reintentos: 3          # [propio] veces que se repite el reset si /odom aún no llega al instante del tag
+  reset_espera_s: 0.3          # [propio] entre reintentos del reset
+
+seguridad:
+  requiere_autorizacion: true  # sin turno autorizado no hay movimiento (y falla cerrada si nunca llegó)
+  requiere_enlace: true        # sin enlace con el broker no se mueve ni se solicita
+  enlace_max_s: 2.0            # [propio] el enlace se da por perdido si su último latido es más viejo (2 Hz esperado)
+  estacion_offline_aborta: true

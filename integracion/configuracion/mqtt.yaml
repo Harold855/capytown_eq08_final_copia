@@ -1,0 +1,34 @@
+# Conexión y tópicos MQTT del equipo eq08. Lo lee integracion/mqtt_config.py (cargar_mqtt).
+# El contrato es del docente (vendor/granprix/docs/arquitectura/00-contrato-mqtt.md); las pruebas
+# comparan este archivo con su módulo de tópicos y con su tabla: si el contrato cambia, falla la prueba.
+#
+# NUNCA poner aquí la contraseña. El docente la lee de la variable de entorno GRANPRIX_MQTT_CLAVE y aquí
+# solo se guarda su NOMBRE. El cargador rechaza cualquier clave con aspecto de secreto.
+# Entre máquinas solo viaja MQTT: ROS 2 es local (ROS_DOMAIN_ID=8, ROS_LOCALHOST_ONLY=1).
+version: 1
+
+equipo: 8                      # número de equipo: eq08 en los tópicos
+
+broker:
+  host: 192.168.50.10          # broker del curso en la red del laboratorio
+  puerto: 1883
+  usuario: carrito08           # patrón carritoNN del contrato; CONFIRMAR con el curso
+  clave_env: GRANPRIX_MQTT_CLAVE   # nombre de la variable de entorno con la contraseña (no el valor)
+
+tiempos:
+  telemetria_max_hz: 5         # el contrato: telemetría de hasta 5 Hz
+  offline_tras_s: 3.0          # Race Control marca OFFLINE tras 3 s sin telemetría (UMBRAL_LATIDO)
+
+# Plantillas: {eq} = equipo con dos dígitos (08), {n} = número de estación (1 a 4).
+# `publica` dice quién escribe; el carrito solo puede escribir en granprix/eqNN/# y en .../solicitud.
+topicos:
+  estado_carrera:  {plantilla: "granprix/carrera/estado",           publica: race_control, qos: 1, retenido: true}
+  bandera:         {plantilla: "granprix/carrera/bandera",          publica: race_control, qos: 1, retenido: false}
+  turno_estacion:  {plantilla: "granprix/estacion/{n}/turno",       publica: race_control, qos: 1, retenido: true}
+  estado_estacion: {plantilla: "granprix/estacion/{n}/estado",      publica: estacion,     qos: 1, retenido: true}
+  solicitud:       {plantilla: "granprix/estacion/{n}/solicitud",   publica: carrito,      qos: 1, retenido: false}
+  resultado:       {plantilla: "granprix/estacion/{n}/resultado",   publica: estacion,     qos: 1, retenido: false}
+  turno_carrito:   {plantilla: "granprix/eq{eq}/turno",             publica: race_control, qos: 1, retenido: true}
+  telemetria:      {plantilla: "granprix/eq{eq}/telemetria",        publica: carrito,      qos: 0, retenido: false}
+  evento:          {plantilla: "granprix/eq{eq}/evento",            publica: carrito,      qos: 1, retenido: false}
+  vuelta:          {plantilla: "granprix/eq{eq}/vuelta",            publica: carrito,      qos: 1, retenido: false}

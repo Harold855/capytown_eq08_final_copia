@@ -1,0 +1,27 @@
+# Parámetros de la estrategia de cambio de la estación (un programa para los cuatro roles: el rol es un
+# argumento y sus poses van en poses_rolN.yaml). Lo lee app_equipo/configuracion.py (cargar_estacion).
+# Claves desconocidas o duplicadas son error.
+#
+# Origen:  [reto] límite oficial, el cargador rechaza valores más laxos  |  [supuesto] sin confirmar:
+# marco del dock y medidas del montaje (falta dock_frames.yaml del docente)  |  [propio] decisión nuestra
+version: 1
+
+estrategia:
+  tol_pos_m: 0.04      # [reto] acople <= 4 cm. Se puede ser más estricto, no más laxo
+  tol_ang_deg: 6.0     # [reto] acople <= 6 grados
+  tiempo_max_s: 8.0    # [propio] tope del cambio completo; el pit total del reto es <= 10 s con acople y reset.
+                       #          Con las duraciones PLACEHOLDER del brazo simulado E2/E3 duran 15.4 s: medir
+
+# Geometría en el marco del dock (origen en el centro del dock, x en el rumbo de llegada, y a la izquierda).
+# TODO ES [supuesto] hasta medir el montaje real y recibir dock_frames.yaml.
+geometria:
+  cuna_en_robot:         # posición nominal de la cuna respecto del centro del carrito
+    x_m: 0.0
+    y_m: -0.11           # 11 cm a la derecha del centro
+    th_deg: 0.0
+  brazo_en_dock:         # base del brazo respecto del centro del dock
+    x_m: 0.0
+    y_m: -0.29           # a la derecha, a 29 cm
+    th_deg: 0.0
+  alcance_min_m: 0.14    # radio de trabajo del JetCobot alrededor de su base: confirmar con la tabla de alcance
+  alcance_max_m: 0.22

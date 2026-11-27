@@ -1,0 +1,27 @@
+# Qué debe contener la evidencia por vuelta. Lo lee evidencia/verificar_evidencias.py (cargar_spec). Clave desconocida o repetida = error.
+# Lo que genera el curso (grabador) no está especificado del todo: los nombres de tópicos de abajo son CANDIDATOS. Ajústalos tras
+# ver la primera salida real del grabador (`ros2 bag info` de un bag) y anota el cambio en la bitácora.
+version: 1
+
+vueltas: 4                    # [reto] una evidencia por cada vuelta
+
+video:                        # un MP4 por vuelta, con el número de vuelta en el nombre (lap01.mp4, vuelta_2.mp4...)
+  ancho_min: 640              # [HTML] 640 x 480 y 15 fps como mínimo
+  alto_min: 480
+  fps_min: 15.0
+  duracion_min_s: 10.0        # [propio] una vuelta dura ~2 min; menos de esto es un video cortado
+  cobertura_min: 0.9          # [propio] el video debe durar al menos esta fracción de la vuelta (si se conocen los tiempos)
+
+bags:                         # rosbag2: uno por vuelta o uno de toda la tanda
+  tolerancia_s: 5.0           # [propio] holgura al comprobar que el bag cubre la vuelta
+  requeridos:                 # nombre del dato: tópicos aceptables (basta uno) y frecuencia mínima en Hz (0 = al menos un mensaje)
+    odometria: {topics: ["/odom"], hz_min: 5.0}
+    imu: {topics: ["/imu"], hz_min: 5.0}
+    pose_apriltag: {topics: ["/tag/pose", "/pit/medicion"], hz_min: 0.0}
+    escalas_cd_ca: {topics: ["/pit/calibracion"], hz_min: 0.0}
+
+csv:                          # eventos del pit: un CSV por vuelta o uno de toda la tanda
+  patron: "pit"               # el nombre del archivo contiene este texto
+  filas_por_vuelta: 4         # una fila por parada
+  columna_vuelta: vuelta
+  columnas: []                # columnas obligatorias además de la de vuelta (vacío = solo se exige la de vuelta)

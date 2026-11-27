@@ -78,6 +78,7 @@ carrito.granprix_carrito
   cronometro       -> eventos_mision
   tablero_extension/metricas -> cronometro, calibracion, calibracion_tramo, eventos_mision, mision
   adaptador_ros    -> maquina_pit, acople, calibracion_tramo, mision, pose_dock, transformacion_camara_dock, gestor_reset   (rclpy solo dentro de _clase_nodo)
+  nodos/estacion_falsa  -> mision, planificador                                                   (rclpy solo dentro de _clase_nodo)
   nodos/nodo_reset_pose -> gestor_reset, transformacion_camara_dock, pose_dock, reset_pose          (rclpy)
   nodos/tag_emulado     -> gestor_reset, transformacion_camara_dock, docks                         (rclpy solo dentro de _clase_nodo)
   nodos/camara_apriltag_node -> gestor_reset, vision.medicion                                      (rclpy solo dentro de _clase_nodo)

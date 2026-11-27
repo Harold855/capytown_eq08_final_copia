@@ -102,7 +102,7 @@ Bono: +1 por odometría visual documentada (sin pasar de 20). Rige la rúbrica d
 
 ```bash
 bash scripts/preparar_entorno.sh --vision   # entorno virtual y dependencias
-bash scripts/ejecutar_pruebas.sh            # 791 pruebas; "TODO OK" si pasan
+bash scripts/ejecutar_pruebas.sh            # 834 pruebas; "TODO OK" si pasan
 ```
 
 Detalle del entorno en [`docs/entorno_desarrollo.md`](docs/entorno_desarrollo.md).
@@ -115,7 +115,7 @@ Detalle del entorno en [`docs/entorno_desarrollo.md`](docs/entorno_desarrollo.md
 - `simulacion/`: modelo del simulador del HTML, barridos de parámetros e imágenes sintéticas.
 - `evidencia/` y `tablero/`: verificador de evidencia, registro experimental y panel del tablero (prototipo).
 - `scripts/`: entorno, pruebas, diagnósticos (ROSCar, JetCobot), calibración de cámara y copias históricas de RC-0 y RC-1.
-- `tests/`: 791 pruebas propias. `experimentos/`: pruebas de laboratorio, separadas de la evidencia oficial.
+- `tests/`: 834 pruebas propias. `experimentos/`: pruebas de laboratorio, separadas de la evidencia oficial.
 - `vendor/granprix/`: copia fija del repositorio del docente, **sin modificar**.
 - `docs/`: documentación; el índice está en [`docs/README.md`](docs/README.md).
 

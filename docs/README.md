@@ -22,6 +22,7 @@ Qué hay y cuándo leerlo. Los documentos están agrupados por lo que se necesit
 ## Para el día de laboratorio con el ROSCar
 | Documento | Qué contiene |
 |---|---|
+| [`guion_laboratorio.md`](guion_laboratorio.md) | **Guion del día con el ROSCar**: escalera de 10 pasos con comandos, criterios, pruebas con la estación falsa y tabla de valores a medir |
 | [`procedimiento_laboratorio_roscar.md`](procedimiento_laboratorio_roscar.md) | Cómo se trabajó en RC-0 y RC-1 (VNC, contenedor, scripts) |
 | [`material_docente_rc1.md`](material_docente_rc1.md) | Material del docente de RC-1 y ensayo de los scripts en su simulador |
 | [`../scripts/roscar_v01/README.md`](../scripts/roscar_v01/README.md) | Preflight, diagnóstico, prueba de movimiento, registro y análisis de mediciones |

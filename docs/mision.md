@@ -75,6 +75,10 @@ Lo que hace: impedir movimientos no autorizados, impedir la salida durante un in
 
 **Lo que esto no cubre:** si el nodo muere, nadie publica ceros y el firmware conserva la última orden; lo protege el *timeout* de nuestra entrada de `twist_mux` y la parada física, y ambos están **sin verificar** en el robot.
 
+## Probar con el carro sin JetCobot: estación y curso falsos
+
+`carrito/nodos/estacion_falsa.py` hace de Race Control (turno, bandera, enlace) y de las cuatro estaciones (estado y resultado) con los mismos tópicos y JSON que usa el adaptador. **No mueve ningún brazo.** Por defecto no da el turno por sí sola: `ros2 service call /estacion_falsa/iniciar std_srvs/srv/Trigger`. Parámetros: `t_cambio_s` (5,8), `modo` (`ok`, `rechazar`, `no_responder`, `pieza_mala`, `offline`), `estacion_modo` (limita el modo a una estación), `turno_equipo`, `autoiniciar_s`, `registro_dir`. Servicios: `iniciar`, `retirar_turno`, `roja`, `verde`, `cortar_enlace`, `silenciar_enlace`, `restaurar_enlace`, `fallar_proximo`, `no_responder_proximo`. Valida con la pose que el carro **reporta** (tolerancia 4 cm y 6°, pieza que trae, turno), no con la verdadera: mide con cinta. Los tiempos son supuestos. Uso paso a paso en [`guion_laboratorio.md`](guion_laboratorio.md).
+
 ## Interfaz ROS 2 (nombres nuestros, provisionales)
 
 El curso no ha publicado las interfaces del `puente_mqtt`; los nombres son parámetros del nodo y los mensajes del contrato viajan como JSON en `std_msgs/String`.

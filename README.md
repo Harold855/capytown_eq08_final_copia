@@ -2,7 +2,7 @@
 
 **Proyecto final de Robótica – CapyTown**
 
-> **Estado (27-nov-2026):** hay lógica en Python y 834 pruebas automáticas sin robot. **Nada se ha ejecutado todavía contra el ROSCar, un JetCobot, una cámara real, ROS 2 ni un broker real.** Detalle en [`docs/desarrollo_realizado.md`](docs/desarrollo_realizado.md); el plan para el primer día con el robot, en [`docs/guion_laboratorio.md`](docs/guion_laboratorio.md).
+> **Estado (27-nov-2026):** hay lógica en Python y 845 pruebas automáticas sin robot. **Nada se ha ejecutado todavía contra el ROSCar, un JetCobot, una cámara real, ROS 2 ni un broker real.** Detalle en [`docs/desarrollo_realizado.md`](docs/desarrollo_realizado.md); el plan para el primer día con el robot, en [`docs/guion_laboratorio.md`](docs/guion_laboratorio.md).
 > **Precedencia de fuentes:** (1) lo que el docente indique por escrito; (2) su repositorio [`codeplai/GranPrix`](https://github.com/codeplai/GranPrix); (3) el HTML oficial.
 
 ## Equipo
@@ -105,7 +105,7 @@ Bono: +1 por odometría visual documentada (sin pasar de 20). Rige la rúbrica d
 
 ```bash
 bash scripts/preparar_entorno.sh --vision   # entorno virtual y dependencias
-bash scripts/ejecutar_pruebas.sh            # 834 pruebas; "TODO OK" si pasan
+bash scripts/ejecutar_pruebas.sh            # 845 pruebas; "TODO OK" si pasan
 ```
 
 Detalle del entorno en [`docs/entorno_desarrollo.md`](docs/entorno_desarrollo.md).
@@ -118,7 +118,7 @@ Detalle del entorno en [`docs/entorno_desarrollo.md`](docs/entorno_desarrollo.md
 - `simulacion/`: modelo del simulador del HTML, barridos de parámetros e imágenes sintéticas.
 - `evidencia/` y `tablero/`: verificador de evidencia, registro experimental y panel del tablero (prototipo).
 - `scripts/`: entorno, pruebas, diagnósticos (ROSCar, JetCobot), calibración de cámara y copias históricas de RC-0 y RC-1.
-- `tests/`: 834 pruebas propias. `experimentos/`: pruebas de laboratorio, separadas de la evidencia oficial.
+- `tests/`: 845 pruebas propias. `experimentos/`: pruebas de laboratorio, separadas de la evidencia oficial.
 - `vendor/granprix/`: copia fija del repositorio del docente, **sin modificar**.
 - `docs/`: documentación; el índice está en [`docs/README.md`](docs/README.md).
 

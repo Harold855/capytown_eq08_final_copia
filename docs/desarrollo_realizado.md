@@ -30,7 +30,7 @@ Otros documentos: arquitectura en [`arquitectura.md`](arquitectura.md), requisit
 | Estación (JetCobot) | `estacion/` estrategia, roles, compensación, poses, brazo simulado; `scripts/jetcobot_v01/` | Simulado; **nunca contra un brazo** |
 | Visión sin robot | `vision/`, `simulacion/*sintetico.py`, calibración con regla y con damero, `medir_tag.py` | Simulado (cámara sintética); **nunca con la cámara real** |
 | ROSCar: acople fino y calibración por tramo | `carrito/granprix_carrito/acople.py`, `calibracion_tramo.py`, `config/acople.yaml`, `simulacion/robot_simulado.py`, `scripts/roscar_v01/prueba_acople.py`, `prueba_calibracion_adaptativa.py`, `analizar_acople.py` | Simulado; **el ensayo con el robot está preparado, sin ejecutar** |
-| Pruebas | 834 propias en 8 carpetas | Verificado |
+| Pruebas | 845 propias en 8 carpetas | Verificado |
 | Entorno | `scripts/preparar_entorno.sh`, `requirements-*.txt` | Verificado en Linux, Python 3.13 |
 
 **Lo que NO existe:** nodos ROS 2 del carrito (`control_odometria`, `camara_apriltag`, `maquina_pit`), el adaptador ROS 2 del ejecutor, la máquina de estados del pit, el tablero web, la cinemática y manipulación reales del brazo, y cualquier medición física. La lógica de arriba está lista para conectarse a ellos, pero conectarla es trabajo pendiente.
@@ -87,7 +87,7 @@ scripts/
   camara/                      calibrar_focal.py (regla), calibrar_damero.py y medir_tag.py
   historicos/                  copias de RC-0 y RC-1 (referencia, sin modificar)
   preparar_entorno.sh, ejecutar_pruebas.sh
-tests/                         una carpeta por paquete (834 pruebas)
+tests/                         una carpeta por paquete (845 pruebas)
 experimentos/                  plantillas de evidencia (vacío de mediciones reales)
 requirements-dev.txt, requirements-vision.txt
 ```
@@ -161,6 +161,7 @@ requirements-dev.txt, requirements-vision.txt
 - Valida lo que la estación real puede saber: la pose que el carro **reporta**, no la verdadera.
 - **Probado:** núcleo, misión completa de 4 vueltas contra `MaquinaPit`, todas las órdenes del curso en plena marcha y el adaptador real conversando con ella por los tópicos (primer pit); 16 errores introducidos a propósito, todos detectados. Las pruebas encontraron un bug del nodo (un JSON que no era objeto no se descartaba). **Nunca con ROS real.**
 - [`guion_laboratorio.md`](guion_laboratorio.md): escalera de 10 pasos para el día con el ROSCar (diagnóstico, caracterización de `cd`/`ca`, cámara, `marcos.yaml`, nodos, acople, bag real y misión con la estación falsa), con comandos, criterios y la tabla de valores a traer.
+- **Nodo de cámara corregido:** con `tag_id: 0` solo acepta el tag de la estación que anuncia `/pit/dock` (antes aceptaba cualquier tag único y no comprobaba el ID), sin `/pit/dock` no mide (falla cerrada), reinicia el filtro al cambiar de estación y ya no republica la pose anterior con la hora de un cuadro sin tag. Además `/pit/dock` ahora se **repite cada segundo** (solo se publicaba al cambiar: un nodo que arrancara tarde, incluido `nodo_reset_pose`, no lo habría sabido nunca). 8 errores introducidos a propósito, todos detectados.
 - Corregido: `prueba_acople.py ensayo … --csv` (el uso documentado) fallaba porque las opciones comunes solo valían antes del subcomando.
 
 ### 4.6 Configuración YAML (`docs/configuracion.md`)
@@ -250,11 +251,11 @@ bash scripts/ejecutar_pruebas.sh                   # "TODO OK" si pasan
 | `tests/geometria_dock` | 6 | transformaciones 2D |
 | `tests/estacion` | 38 | estrategia, compensación, poses, configuración |
 | `tests/jetcobot_v01` | 11 | diagnóstico y cronómetro |
-| `tests/carrito` | 459 | docks, planificador, equivalencia con el HTML, ejecutor, estimadores, configuración, cámara → dock, reset, nodos con `rclpy` sustituto, acople, calibración por tramo, máquina de la misión y su adaptador |
+| `tests/carrito` | 470 | docks, planificador, equivalencia con el HTML, ejecutor, estimadores, configuración, cámara → dock, reset, nodos con `rclpy` sustituto, acople, calibración por tramo, máquina de la misión y su adaptador |
 | `tests/evidencia` | 63 | registro experimental y verificador de evidencia (MP4, rosbag2, CSV, cobertura) |
 | `tests/comun` | 15 | cargador YAML estricto |
 | `tests/vision` | 152 | AprilTag sintético, calibración con regla y con damero, medición con `medir_tag` (≈ 45 s; se omiten si falta OpenCV) |
-| **Total propias** | **834** | |
+| **Total propias** | **845** | |
 
 Además, las del docente: `pc-race` (126, en el entorno con `--pc-race`) y la herramienta AprilTag (24 con `-k "not tag25h9 and not tag16h5"`).
 

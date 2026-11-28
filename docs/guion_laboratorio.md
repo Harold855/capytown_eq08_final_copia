@@ -91,7 +91,7 @@ Haz decenas de puntos en la zona de acople (±6 cm, ±8°), no uno solo.
 **Revisión con la pieza en la cuna (obligatoria, 5 minutos):** pon un cubo en la cuna del carro y mira la imagen de la cámara en vivo (o `python3 scripts/camara/medir_tag.py continuo --camara 0 --camara-yaml … --tag-id 2 --segundos 20`).
 - ¿Aparece el cubo, o algún código impreso en él, en la imagen? Anótalo con una captura.
 - La medición del tag de la pared **debe seguir saliendo** (código de salida 0) con el cubo puesto, en posición de llegada.
-- Cómo se comporta el software: con `--tag-id` fijo, los tags de otro ID se **ignoran**; solo se rechaza la medición (`varios_tags`) si hay dos tags del mismo ID o si no se fija ninguno y aparecen dos. Si el código del cubo tuviera el mismo ID que el tag del dock, o si el nodo corre sin `tag_id`, sí habría problema. **No sé si los cubos del curso llevan código**: esta revisión lo dice.
+- Cómo se comporta el software: con un ID elegido (`--tag-id` en `medir_tag.py`, o la estación anunciada por `/pit/dock` en el nodo de cámara) los tags de otro ID se **ignoran**; solo se rechaza la medición (`varios_tags`) si hay dos tags **del mismo ID**. Si el código del cubo tuviera el mismo ID que el tag del dock, sí habría problema. **No sé si los cubos del curso llevan código**: esta revisión lo dice.
 
 ### P6 · Montaje de la cámara y posición del tag  → `marcos.yaml`
 **Hacer:** coloca el robot **exactamente sobre su marca** en un dock (centro del dock, rumbo de llegada), mide con cinta dónde está el tag respecto al centro del dock y:
@@ -111,7 +111,7 @@ python3 carrito/nodos/camara_apriltag_node.py --ros-args -p camara_yaml:=experim
 python3 carrito/nodos/nodo_reset_pose.py --ros-args -p marcos_yaml:=carrito/config/marcos.yaml -p retardo_odom_s:=<del P4>
 ros2 topic echo /tag/pose --once ; ros2 service call /reset_pose/aplicar std_srvs/srv/Trigger
 ```
-En este paso `tag_id` es el de **un solo dock** (el del P6). Más abajo, para la misión de 4 estaciones, hay que **quitarlo**. `/pit/dock` debe valer la estación donde está el robot (`ros2 topic pub --once /pit/dock std_msgs/msg/Int32 "{data: 2}"` si aún no corre la máquina).
+En este paso `tag_id` es el de **un solo dock** (el del P6); para la misión de 4 estaciones se **quita** y el nodo sigue a `/pit/dock`. Con `tag_id` sin fijar, `/pit/dock` debe valer la estación donde está el robot, y **sin él el nodo no mide** (`sin_dock` en `~/estado`): `ros2 topic pub -r 1 /pit/dock std_msgs/msg/Int32 "{data: 2}"` si aún no corre la máquina.
 **Pasa si:** `/tag/pose` llega a ≥ 5 Hz sin excepciones y el servicio responde con `motivo` coherente (`ODOM_INSUFICIENTE` en el primer intento es normal: reintenta).
 **Si falla:** anota el error exacto (primera vez que corre con `rclpy` real) y la versión de OpenCV / `pupil-apriltags` del Pi.
 
@@ -141,13 +141,13 @@ Es la prueba de la máquina completa: navegación, visión, acople, solicitud, e
 Preparación: copia `carrito/config/mision.yaml` a `experimentos/diaNN_roscar/mision_1vuelta.yaml` y pon `vueltas: 1`. Terminales (el robot en la marca de E1):
 ```bash
 python3 carrito/nodos/estacion_falsa.py --ros-args -p t_cambio_s:=5.8 -p registro_dir:=experimentos/diaNN_roscar/falsa
-python3 carrito/nodos/camara_apriltag_node.py --ros-args ...               # como en P7 pero SIN tag_id (0 = cualquiera): con un ID fijo solo mediría 1 de las 4 estaciones
+python3 carrito/nodos/camara_apriltag_node.py --ros-args ...               # como en P7 pero SIN tag_id: sigue a /pit/dock (con un ID fijo solo mediría 1 de las 4 estaciones)
 python3 carrito/nodos/nodo_reset_pose.py --ros-args ...                    # como en P7
 python3 carrito/granprix_carrito/adaptador_ros.py --ros-args -p marcos_yaml:=carrito/config/marcos.yaml \
   -p mision_yaml:=experimentos/diaNN_roscar/mision_1vuelta.yaml -p cmd_topic:=<entrada autorizada del P1> \
   -p resultados_dir:=experimentos/diaNN_roscar/resultados
 ```
-Con `tag_id` sin fijar, el nodo acepta cualquier tag **único** a la vista y la estación se toma de `/pit/dock`: el nodo **no comprueba** que el ID detectado coincida con la estación actual (si dos docks quedaran en el campo de visión, mediría el equivocado). Vigila que cada medición cuadre con el dock donde está el robot. La máquina queda en `ESPERA`: **no da el turno por sí sola**. El curso falso lo da con `ros2 service call /estacion_falsa/iniciar std_srvs/srv/Trigger`.
+Con `tag_id` sin fijar, el nodo de cámara solo acepta el tag cuyo ID es la estación que anuncia `/pit/dock` (el adaptador lo repite cada segundo); si ves `otro_id` o `sin_dock` creciendo en `ros2 topic echo /camara_apriltag/estado`, mira primero eso. La máquina queda en `ESPERA`: **no da el turno por sí sola**. El curso falso lo da con `ros2 service call /estacion_falsa/iniciar std_srvs/srv/Trigger`.
 
 Haz las pruebas en este orden, cada una con el vigilante listo:
 

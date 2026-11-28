@@ -14,6 +14,7 @@ sys.path.insert(0, str(RAIZ / 'scripts' / 'roscar_v01'))    # mensajes_contrato.
 
 from carrito.granprix_carrito.gestor_reset import dth_de_cuaternion, yaw_de_cuaternion  # noqa: E402
 
+DOCK_CADA_S = 1.0
 PARAMETROS = {
     'carrito_dir': str(RAIZ / 'carrito' / 'config'), 'robot': 'eq08-roscar', 'marcos_yaml': '', 'mision_yaml': '', 'acople_yaml': '',
     'odom_topic': '/odom', 'tag_topic': '/tag/pose', 'cmd_topic': '/cmd_vel', 'reset_service': '/reset_pose/aplicar',
@@ -77,7 +78,7 @@ def _clase_nodo():
             self.fsm = MaquinaPit(Mision(cfg_mision), mov, cfg_acople, self.calibrador, medidor, self, self, time.monotonic,
                                   time.time, self._odom_ok)
             self._ultimo = None
-            self._dock = None
+            self._dock, self._t_dock = None, 0.0
             for tipo, clave, cb, qos in ((Odometry, 'odom', self._on_odom, qos_profile_sensor_data),
                                          (PoseStamped, 'tag', self._on_tag, qos_profile_sensor_data),
                                          (Bool, 'enlace', self._on_enlace, 10), (String, 'turno', self._on_turno, 10),
@@ -199,8 +200,9 @@ def _clase_nodo():
             f = self.fsm
             antes = f.estado
             f.paso()
-            if f.mision.estacion != self._dock:
-                self._dock = f.mision.estacion
+            ahora = time.monotonic()
+            if f.mision.estacion != self._dock or ahora - self._t_dock >= DOCK_CADA_S:      # se repite: quien arranque tarde también se entera
+                self._dock, self._t_dock = f.mision.estacion, ahora
                 self.pub_dock.publish(Int32(data=int(self._dock)))
             if f.estado is not self._ultimo:
                 self._ultimo = f.estado

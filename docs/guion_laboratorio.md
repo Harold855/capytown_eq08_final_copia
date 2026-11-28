@@ -17,7 +17,7 @@ Complementa a [`procedimiento_laboratorio_roscar.md`](procedimiento_laboratorio_
 ## 1. Antes de salir (en la PC)
 
 - [ ] `git pull` de `main` y `bash scripts/ejecutar_pruebas.sh` → `TODO OK`.
-- [ ] Llevar: cinta métrica, transportador circular, regla, cinta de pintor (marcas de dock a ≥ 25 cm del centro de las ruedas), 4 AprilTags 36h11 de 6 cm impresos (id = estación) con su tamaño real medido, damero si hay, cargador, cable de red.
+- [ ] Llevar: cinta métrica, transportador circular, regla, cinta de pintor (marcas de dock a ≥ 25 cm del centro de las ruedas), los **4 tags oficiales** de los docks (AprilTag 36h11 de 6 cm, ID = número de estación; los entrega el curso en `docks/` de `granprix-esan`, que **todavía no está en nuestra copia**: confirma con el docente cómo y cuándo), un cubo del curso (para la revisión de la cuna del P5), damero si hay, cargador, cable de red. Para ensayar antes de tener los oficiales puedes generar uno con la herramienta del docente (`python3 vendor/granprix/estacion/herramientas/herramienta_apriltag.py crear --help`); **mide con regla el lado real de cada tag impreso**.
 - [ ] Copiar el repositorio al Pi y de ahí al contenedor (`scp -r`, `docker cp`; ver el procedimiento). Los commits se hacen desde la PC, nunca desde el Pi.
 - [ ] Imprimir la tabla de valores de la sección 12.
 
@@ -76,6 +76,8 @@ python3 scripts/roscar_v01/analizar_movimientos.py
 **Resultado:** valores para `pausa_s` y `asentamiento_s` (`movimiento.yaml`, hoy 0,3 y 0,5 s, **supuestos**) y el retardo de `/odom` (0,5–0,65 s en RC-1) para el reset de pose. *(No hay script de análisis para esto todavía: pídelo si lo necesitas.)*
 
 ### P5 · Cámara
+**Qué estás midiendo:** el tag de la pared es un cuadrado negro con una cuadrícula de bits (familia 36h11) cuyo ID es la estación. Al conocer su tamaño real y la calibración de la cámara, sus cuatro esquinas en la imagen dan su pose respecto a la cámara (`z` ≈ 28 cm, `x` lateral, `dth`), y de ahí, con el montaje de la cámara, la pose del carro en el dock. **Un lado mal medido o una focal mal calibrada se convierten en error de distancia en la misma proporción**: por eso se mide el tag impreso y se calibra primero. Los códigos de los cubos del JetCobot no intervienen: las piezas se distinguen por color y el brazo no usa cámara.
+
 **Hacer:** sigue [`procedimiento_calibracion_camara.md`](procedimiento_calibracion_camara.md): `calibrar_focal.py capturar` → `calcular` → `validar` (con el tag a los lados). Si falla fuera del eje, damero ([`procedimiento_calibracion_damero.md`](procedimiento_calibracion_damero.md)). Después valida con regla y transportador:
 ```bash
 python3 scripts/camara/medir_tag.py comparar --camara 0 --camara-yaml experimentos/diaNN_camara/camara_calibrada.yaml \
@@ -85,6 +87,11 @@ python3 scripts/camara/medir_tag.py resumen --csv experimentos/diaNN_camara/medi
 Haz decenas de puntos en la zona de acople (±6 cm, ±8°), no uno solo.
 **Pasa si:** error medio y p95 de pose compatibles con decidir 4 cm y 6° con margen.
 **Anotar:** el tamaño real del tag, la resolución y si el enfoque a ~28 cm es bueno.
+
+**Revisión con la pieza en la cuna (obligatoria, 5 minutos):** pon un cubo en la cuna del carro y mira la imagen de la cámara en vivo (o `python3 scripts/camara/medir_tag.py continuo --camara 0 --camara-yaml … --tag-id 2 --segundos 20`).
+- ¿Aparece el cubo, o algún código impreso en él, en la imagen? Anótalo con una captura.
+- La medición del tag de la pared **debe seguir saliendo** (código de salida 0) con el cubo puesto, en posición de llegada.
+- Cómo se comporta el software: con `--tag-id` fijo, los tags de otro ID se **ignoran**; solo se rechaza la medición (`varios_tags`) si hay dos tags del mismo ID o si no se fija ninguno y aparecen dos. Si el código del cubo tuviera el mismo ID que el tag del dock, o si el nodo corre sin `tag_id`, sí habría problema. **No sé si los cubos del curso llevan código**: esta revisión lo dice.
 
 ### P6 · Montaje de la cámara y posición del tag  → `marcos.yaml`
 **Hacer:** coloca el robot **exactamente sobre su marca** en un dock (centro del dock, rumbo de llegada), mide con cinta dónde está el tag respecto al centro del dock y:
@@ -100,11 +107,11 @@ El `0.38,0,0` es un **supuesto** (28 cm de cámara a tag + 10 cm de cámara a ce
 En terminales separadas (robot sobre su marca, sin moverlo):
 ```bash
 python3 carrito/nodos/camara_apriltag_node.py --ros-args -p camara_yaml:=experimentos/diaNN_camara/camara_calibrada.yaml \
-  -p tamano_mm:=<tamaño real> -p tag_id:=2 -p image_topic:=<tópico de imagen del P1>
+  -p tamano_mm:=<lado real medido del tag> -p tag_id:=<ID de la estación donde está el robot> -p image_topic:=<tópico de imagen del P1>
 python3 carrito/nodos/nodo_reset_pose.py --ros-args -p marcos_yaml:=carrito/config/marcos.yaml -p retardo_odom_s:=<del P4>
 ros2 topic echo /tag/pose --once ; ros2 service call /reset_pose/aplicar std_srvs/srv/Trigger
 ```
-`/pit/dock` debe valer la estación donde está el robot (`ros2 topic pub --once /pit/dock std_msgs/msg/Int32 "{data: 2}"` si aún no corre la máquina).
+En este paso `tag_id` es el de **un solo dock** (el del P6). Más abajo, para la misión de 4 estaciones, hay que **quitarlo**. `/pit/dock` debe valer la estación donde está el robot (`ros2 topic pub --once /pit/dock std_msgs/msg/Int32 "{data: 2}"` si aún no corre la máquina).
 **Pasa si:** `/tag/pose` llega a ≥ 5 Hz sin excepciones y el servicio responde con `motivo` coherente (`ODOM_INSUFICIENTE` en el primer intento es normal: reintenta).
 **Si falla:** anota el error exacto (primera vez que corre con `rclpy` real) y la versión de OpenCV / `pupil-apriltags` del Pi.
 
@@ -134,13 +141,13 @@ Es la prueba de la máquina completa: navegación, visión, acople, solicitud, e
 Preparación: copia `carrito/config/mision.yaml` a `experimentos/diaNN_roscar/mision_1vuelta.yaml` y pon `vueltas: 1`. Terminales (el robot en la marca de E1):
 ```bash
 python3 carrito/nodos/estacion_falsa.py --ros-args -p t_cambio_s:=5.8 -p registro_dir:=experimentos/diaNN_roscar/falsa
-python3 carrito/nodos/camara_apriltag_node.py --ros-args ...               # como en P7
+python3 carrito/nodos/camara_apriltag_node.py --ros-args ...               # como en P7 pero SIN tag_id (0 = cualquiera): con un ID fijo solo mediría 1 de las 4 estaciones
 python3 carrito/nodos/nodo_reset_pose.py --ros-args ...                    # como en P7
 python3 carrito/granprix_carrito/adaptador_ros.py --ros-args -p marcos_yaml:=carrito/config/marcos.yaml \
   -p mision_yaml:=experimentos/diaNN_roscar/mision_1vuelta.yaml -p cmd_topic:=<entrada autorizada del P1> \
   -p resultados_dir:=experimentos/diaNN_roscar/resultados
 ```
-La máquina queda en `ESPERA`: **no da el turno por sí sola**. El curso falso lo da con `ros2 service call /estacion_falsa/iniciar std_srvs/srv/Trigger`.
+Con `tag_id` sin fijar, el nodo acepta cualquier tag **único** a la vista y la estación se toma de `/pit/dock`: el nodo **no comprueba** que el ID detectado coincida con la estación actual (si dos docks quedaran en el campo de visión, mediría el equivocado). Vigila que cada medición cuadre con el dock donde está el robot. La máquina queda en `ESPERA`: **no da el turno por sí sola**. El curso falso lo da con `ros2 service call /estacion_falsa/iniciar std_srvs/srv/Trigger`.
 
 Haz las pruebas en este orden, cada una con el vigilante listo:
 
@@ -177,7 +184,9 @@ Paras, anotas y recoges si: el robot no frena con ceros en P2; `twist_mux` ignor
 | `cd`, `ca` (con v = 0,10 m/s y ω = 0,5 rad/s) | `calibracion.yaml` | P3 | |
 | Dispersión de rectas y giros | bitácora | P3 | |
 | Entrada de `twist_mux` y su *timeout* | `cmd_topic` del adaptador | P1 | |
-| Tópico de imagen, resolución, tamaño real del tag | parámetros del nodo de cámara | P1/P5 | |
+| Tópico de imagen, resolución, **lado real de cada tag impreso** | parámetros del nodo de cámara (`tamano_mm`) | P1/P5 | |
+| ¿Aparece el cubo (o un código) en la imagen con la pieza en la cuna? ¿Sigue midiéndose el tag? | bitácora | P5 | |
+| De dónde salen los tags oficiales y su ID por estación | pregunta al docente | antes | |
 | `pausa_s`, `asentamiento_s`, retardo de `/odom` | `movimiento.yaml`, `retardo_odom_s` | P4 | |
 | Focal y distorsión de la cámara | `camara_calibrada.yaml` | P5 | |
 | Montaje de la cámara (x, y, yaw, inclinación) y tag en el dock | `marcos.yaml` | P6 | |
@@ -187,5 +196,7 @@ Paras, anotas y recoges si: el robot no frena con ceros en P2; `twist_mux` ignor
 | Tiempo real de pit sin y con corrección | informe | P10 | |
 
 ## 7. Lo que este guion NO cubre
+
+Los tags oficiales (`docks/`, `dock_frames.yaml`) no están en nuestra copia del repositorio del curso, así que la posición del tag en el dock sale solo de tu medición.
 
 El intercambio real con el brazo y su tiempo, el `puente_mqtt`, el `vigilante_red` y Race Control reales (los nombres de tópicos del adaptador son provisionales), el video por vuelta, el grabador del curso y el tablero base. Sin el JetCobot tampoco se valida el pit de 10 s completo: solo la parte del carro.

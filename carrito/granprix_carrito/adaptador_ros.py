@@ -182,7 +182,7 @@ def _clase_nodo():
         def _on_resultado(self, msg):
             n, d = self._campo(msg, 'estacion', int)
             if n is not None and d.get('equipo') == self.equipo and isinstance(d.get('ok'), bool):
-                self.fsm.recibir_resultado(n, d['ok'], d.get('pieza_dejo'))
+                self.fsm.recibir_resultado(n, d['ok'], d.get('pieza_dejo'), d['motivo'] if isinstance(d.get('motivo'), str) else None)
 
         # ---------------- Servicios y ciclo
         def _srv_reiniciar(self, peticion, respuesta):

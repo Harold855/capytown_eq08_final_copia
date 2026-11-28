@@ -12,6 +12,7 @@ Todo lo externo entra por `recibir_*` y toda salida hacia el curso sale por el `
 """
 from __future__ import annotations
 
+import dataclasses
 import time
 from dataclasses import asdict
 from enum import Enum
@@ -46,7 +47,7 @@ class Estado(Enum):
 
 E = Estado
 TRANSICIONES = {E.ESPERA: {E.MIDIENDO}, E.NAVEGANDO: {E.MIDIENDO}, E.MIDIENDO: {E.ACOPLANDO}, E.ACOPLANDO: {E.SOLICITANDO},
-                E.SOLICITANDO: {E.ESPERANDO_RESULTADO}, E.ESPERANDO_RESULTADO: {E.RECALIBRANDO},
+                E.SOLICITANDO: {E.ESPERANDO_RESULTADO}, E.ESPERANDO_RESULTADO: {E.RECALIBRANDO, E.MIDIENDO},
                 E.RECALIBRANDO: {E.SALIENDO}, E.SALIENDO: {E.NAVEGANDO, E.FIN}, E.FIN: {E.ESPERA}, E.FALLA: {E.ESPERA}}
 INACTIVOS = (E.ESPERA, E.FIN, E.FALLA)
 MOVIMIENTO = (E.NAVEGANDO, E.ACOPLANDO)
@@ -161,13 +162,13 @@ class MaquinaPit:
     def recibir_tag(self, pose: PoseDock) -> None:
         self.medidor.agregar(pose)
 
-    def recibir_resultado(self, estacion: int, ok: bool, pieza_dejo: Optional[str]) -> bool:
+    def recibir_resultado(self, estacion: int, ok: bool, pieza_dejo: Optional[str], motivo: Optional[str] = None) -> bool:
         if self.estado is not E.ESPERANDO_RESULTADO or estacion != self.mision.estacion or self._res is not None:
             self.ignorados += 1
             self._ev('ignorado', estacion_resultado=estacion, ok=ok)
             return False
         self._res = (bool(ok), pieza_dejo)
-        self._ev('resultado', ok=bool(ok), pieza_dejo=pieza_dejo)
+        self._ev('resultado', motivo, ok=bool(ok), pieza_dejo=pieza_dejo)
         return True
 
     def parar(self, motivo: str = 'PARADA_MANUAL') -> None:
@@ -218,6 +219,7 @@ class MaquinaPit:
         self._post: Optional[PoseDock] = None
         self._pose_salida: Optional[Pose2D] = None
         self._lim_nav = 0.0
+        self._restantes = 0                  # reintentos que quedan en esta parada (acople + rechazos de la estación)
         self._t_freno = self._t
         self.pieza: Optional[str] = None
         self._sub()
@@ -284,13 +286,14 @@ class MaquinaPit:
         self._t_freno = t
         self._reg = self.mision.abrir_pit(self.reloj_ts())
         self._acople, self._res, self._post = None, None, None
+        self._restantes = self.mision.cfg.tiempos.reintentos_por_parada
         self.medidor.en_reposo()
         self._ir(E.MIDIENDO)
 
     def _midiendo(self, t: float) -> None:
         pose = self.medidor.intentar()
         if pose is not None:
-            c = self.cfg_acople
+            c = dataclasses.replace(self.cfg_acople, reintentos=min(self.cfg_acople.reintentos, self._restantes))
             self._gen = acoplar_pasos(self.medidor.esperar, self._mover, c, self.calibrador.estimador.escalas, self.reloj,
                                       self._debe_parar, pose)
             self._ir(E.ACOPLANDO)
@@ -302,11 +305,14 @@ class MaquinaPit:
         except StopIteration as fin:
             res = fin.value
         self._gen, self._acople, reg = None, res, self._reg
-        reg.correcciones, reg.reintentos = res.correcciones, max(0, res.correcciones - 1)
-        for _ in range(reg.reintentos):
+        usados = max(0, res.correcciones - 1)           # la primera corrección no es un reintento
+        self._restantes = max(0, self._restantes - usados)
+        reg.correcciones += res.correcciones
+        reg.reintentos += usados
+        for _ in range(usados):
             self.puerto.evento('reintento', self.mision.estacion)
         for pose, lado in ((res.pose_inicial, 'pre'), (res.pose_final, 'post')):
-            if pose is not None:
+            if pose is not None and not (lado == 'pre' and reg.err_pos_pre_m is not None):      # el error previo es el de la primera medición
                 pos, ang = pose.error
                 setattr(reg, f'err_pos_{lado}_m', pos)
                 setattr(reg, f'err_ang_{lado}_deg', ang)
@@ -320,6 +326,8 @@ class MaquinaPit:
     def _solicitando(self, t: float) -> None:
         if self.seg.intercambio():
             return
+        if self.mision.cfg.seguridad.solicitar_solo_si_esperando and self.entorno.estaciones.get(self.mision.estacion) not in (None, 'ESPERANDO'):
+            return                                                     # se sabe que la rechazaría: se espera sin gastar un reintento
         self.puerto.solicitud(self.mision.estacion, self._acople.pose_final, self.mision.pieza_trae)
         self._ev('solicitud', pieza_trae=self.mision.pieza_trae, **self._acople.pose_final.a_contrato())
         self.entorno.intercambio = True
@@ -330,7 +338,18 @@ class MaquinaPit:
             return
         ok, pieza = self._res
         if not ok:
-            self._fallar('RESULTADO_NO_OK')
+            if self._restantes <= 0:
+                self._fallar('RESULTADO_NO_OK')
+                return
+            self._restantes -= 1                                       # un rechazo no es una intervención: se vuelve a medir, acoplar y solicitar
+            self._reg.rechazos += 1
+            self._reg.reintentos += 1
+            self.puerto.evento('reintento', self.mision.estacion)
+            self._ev('rechazo', restantes=self._restantes)
+            self._res, self._acople = None, None
+            self.entorno.intercambio = False                           # no hubo intercambio
+            self.medidor.en_reposo(0.0)                                # el robot no se movió
+            self._ir(E.MIDIENDO)
             return
         self.entorno.intercambio = False
         self.medidor.en_reposo(0.0)      # el robot no se movió: bastan lecturas posteriores al resultado

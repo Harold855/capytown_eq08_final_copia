@@ -27,9 +27,11 @@ tiempos:
   medicion_post_s: 2.0         # [propio] segunda medición tras el intercambio; si falta se sigue con la última del acople
   reset_reintentos: 3          # [propio] veces que se repite el reset si /odom aún no llega al instante del tag
   reset_espera_s: 0.3          # [propio] entre reintentos del reset
+  reintentos_por_parada: 2     # [reto] máximo 2 por parada: los gastan los reintentos del acople y los rechazos de la estación
 
 seguridad:
   requiere_autorizacion: true  # sin turno autorizado no hay movimiento (y falla cerrada si nunca llegó)
   requiere_enlace: true        # sin enlace con el broker no se mueve ni se solicita
   enlace_max_s: 2.0            # [propio] el enlace se da por perdido si su último latido es más viejo (2 Hz esperado)
   estacion_offline_aborta: true
+  solicitar_solo_si_esperando: true   # [doc. 02] el supervisor solo acepta con la estación en ESPERANDO: antes no se gasta un reintento

@@ -60,6 +60,14 @@ def entorno(**kw):
     return ef.EntornoFalso(ef.ConfigFalsa(**kw), r, lambda: 1.7e9 + r.t), r
 
 
+def listo(**kw):
+    """Entorno con turno dado y las estaciones ya en ESPERANDO (lo que ve el carro al llegar a una parada)."""
+    e, r = entorno(**kw)
+    e.iniciar()
+    correr(e, r, 0.3)
+    return e, r
+
+
 def correr(e, r, s, dt=0.1):
     salida = []
     fin = r.t + s
@@ -128,9 +136,7 @@ class TestCurso(unittest.TestCase):
 
 class TestEstacion(unittest.TestCase):
     def intercambio(self, **kw):
-        e, r = entorno(**kw)
-        e.iniciar()
-        return e, r
+        return listo(**kw)
 
     def test_intercambio_normal_estados_y_resultado(self):
         e, r = self.intercambio()
@@ -143,9 +149,10 @@ class TestEstacion(unittest.TestCase):
         (res,) = de(s, 'resultado')
         self.assertEqual((res['ok'], res['estacion'], res['equipo'], res['pieza_dejo'], res['t_cambio']), (True, 2, 8, 'B', 5.8))
         self.assertEqual(e.estados[2], 'LISTA')
-        correr(e, r, 1.0)
-        self.assertEqual(e.estados[2], 'LIBRE')
+        s = correr(e, r, 1.0)
+        self.assertEqual(e.estados[2], 'ESPERANDO')                          # LISTA -> LIBRE -> ESPERANDO: vuelve a recibir
         self.assertEqual(e.n['resultados'], 1)
+        self.assertEqual([m['estado'] for m in de(s, 'estacion_estado') if m['estacion'] == 2][-1], 'ESPERANDO')
 
     def test_el_resultado_llega_antes_o_despues_del_estado_segun_la_configuracion(self):
         for antes in (True, False):
@@ -178,10 +185,10 @@ class TestEstacion(unittest.TestCase):
             e.solicitud(est, sol(est, **kw))
             (res,) = de(correr(e, r, 1.0), 'resultado')
             self.assertEqual((res['ok'], res['motivo']), (False, motivo))
-            self.assertEqual(e.estados[est], 'LIBRE')                        # un rechazo no deja la estación en LISTA
+            self.assertEqual(e.estados[est], 'ESPERANDO')                    # un rechazo no cambia el estado de la estación
 
-    def test_un_rechazo_libera_la_estacion_y_un_exito_la_deja_lista(self):
-        for pose, esperado in ((0.0, 'LISTA'), (0.1, 'LIBRE')):
+    def test_un_rechazo_deja_la_estacion_esperando_y_un_exito_la_deja_lista(self):
+        for pose, esperado in ((0.0, 'LISTA'), (0.1, 'ESPERANDO')):
             e, r = self.intercambio(t_cambio_s=0.1, t_liberar_s=5.0)
             e.solicitud(1, sol(1, dx=pose))
             correr(e, r, 0.5)                                                    # ya respondió y aún no liberó
@@ -202,7 +209,53 @@ class TestEstacion(unittest.TestCase):
         for est in (0, 5, None, [1], True, 'x'):
             self.assertEqual(e.solicitud(est, sol()), 'DESCARTADO_ESTACION')
         self.assertEqual(de(correr(e, r, 2.0), 'resultado'), [])
-        self.assertEqual((e.n['solicitudes'], e.estados[1]), (0, 'LIBRE'))
+        self.assertEqual((e.n['solicitudes'], e.estados[1]), (0, 'ESPERANDO'))
+
+    def test_solo_se_acepta_con_la_estacion_en_esperando(self):
+        e, r = entorno(t_cambio_s=0.1)                                       # sin turno: las estaciones siguen LIBRE
+        e.solicitud(1, sol(1))
+        (res,) = de(correr(e, r, 1.0), 'resultado')
+        self.assertEqual((res['ok'], res['motivo'], e.estados[1], e.ultima_solicitud['estado_al_recibir']), (False, 'NO_ESPERANDO', 'LIBRE', 'LIBRE'))
+        e, r = entorno(t_cambio_s=0.1, esperando_retardo_s=3.0)              # con turno pero antes del retardo
+        e.iniciar()
+        correr(e, r, 1.0)
+        self.assertEqual(e.estados[1], 'LIBRE')
+        e.solicitud(1, sol(1))
+        self.assertEqual(de(correr(e, r, 1.0), 'resultado')[0]['motivo'], 'NO_ESPERANDO')
+        correr(e, r, 3.0)
+        self.assertEqual(e.estados[1], 'ESPERANDO')
+        e.solicitud(1, sol(1))
+        self.assertTrue(de(correr(e, r, 1.0), 'resultado')[0]['ok'])
+
+    def test_si_se_retira_el_turno_las_estaciones_dejan_de_esperar(self):
+        e, r = self.intercambio()
+        e.retirar_turno()
+        correr(e, r, 0.5)
+        self.assertEqual(set(e.estados.values()), {'LIBRE'})
+
+    def test_orden_de_validacion_estado_equipo_pose_bandera(self):
+        casos = ((dict(equipo=7, dx=0.1), 'SIN_TURNO'), (dict(dx=0.1), 'FUERA_DE_TOLERANCIA'), (dict(dth=7.0), 'FUERA_DE_TOLERANCIA'), (dict(), 'BANDERA_ROJA'),
+                 (dict(dx=0.1), 'FUERA_DE_TOLERANCIA'), (dict(pieza='C'), 'BANDERA_ROJA'))
+        for i, (kw, motivo) in enumerate(casos):
+            e, r = self.intercambio(t_cambio_s=0.1)
+            if i >= 3:
+                e.bandera('roja')
+            e.solicitud(1, sol(1, **kw))
+            self.assertEqual(de(correr(e, r, 1.0), 'resultado')[0]['motivo'], motivo, msg=(kw, i))
+        e, r = entorno(t_cambio_s=0.1)                                       # el estado se valida antes que todo lo demás
+        e.solicitud(1, sol(1, equipo=7, dx=0.5))
+        self.assertEqual(de(correr(e, r, 1.0), 'resultado')[0]['motivo'], 'NO_ESPERANDO')
+
+    def test_el_rechazo_es_inmediato_no_pasa_por_cambiando_y_se_puede_reintentar(self):
+        e, r = self.intercambio(t_cambio_s=5.8, t_rechazo_s=0.2)
+        e.solicitud(1, sol(1, dx=0.1))
+        s = correr(e, r, 0.5)
+        (res,) = de(s, 'resultado')
+        self.assertEqual((res['ok'], res['pieza_dejo'], res['t_cambio']), (False, None, None))
+        self.assertNotIn('CAMBIANDO', {m['estado'] for m in de(s, 'estacion_estado')})
+        self.assertEqual((e.estados[1], e.n['rechazos']), ('ESPERANDO', 1))
+        self.assertIsNone(e.solicitud(1, sol(1)))                              # reintento aceptado de inmediato
+        self.assertEqual(e.estados[1], 'CAMBIANDO')
 
     def test_una_segunda_solicitud_mientras_cambia_se_ignora(self):
         e, r = self.intercambio(t_cambio_s=1.0)
@@ -226,13 +279,13 @@ class TestModosDeFalla(unittest.TestCase):
         self.assertEqual((res['ok'], res['motivo']), (False, 'RECHAZO_FORZADO'))
 
     def test_no_responder_deja_la_estacion_cambiando_para_siempre(self):
-        e, r = entorno(modo='no_responder', t_cambio_s=0.1)
+        e, r = listo(modo='no_responder', t_cambio_s=0.1)
         e.solicitud(1, sol(1))
         self.assertEqual(de(correr(e, r, 200.0), 'resultado'), [])
         self.assertEqual(e.estados[1], 'CAMBIANDO')
 
     def test_pieza_mala_responde_ok_con_otra_pieza(self):
-        e, r = entorno(modo='pieza_mala', t_cambio_s=0.1)
+        e, r = listo(modo='pieza_mala', t_cambio_s=0.1)
         e.solicitud(2, sol(2))
         (res,) = de(correr(e, r, 1.0), 'resultado')
         self.assertEqual((res['ok'], res['pieza_dejo']), (True, 'Z'))
@@ -245,14 +298,14 @@ class TestModosDeFalla(unittest.TestCase):
         self.assertEqual(e.solicitud(3, sol(3)), 'ESTACION_OFFLINE')
 
     def test_estacion_modo_limita_la_falla_a_una_estacion(self):
-        e, r = entorno(modo='rechazar', estacion_modo=2, t_cambio_s=0.1)
+        e, r = listo(modo='rechazar', estacion_modo=2, t_cambio_s=0.1)
         e.solicitud(1, sol(1))
         e.solicitud(2, sol(2))
         res = {m['estacion']: m['ok'] for m in de(correr(e, r, 1.0), 'resultado')}
         self.assertEqual(res, {1: True, 2: False})
 
     def test_fallar_proximo_vale_una_sola_vez(self):
-        e, r = entorno(t_cambio_s=0.1)
+        e, r = listo(t_cambio_s=0.1)
         e.fallar_proximo('rechazar')
         e.solicitud(1, sol(1))
         correr(e, r, 1.0)
@@ -299,7 +352,7 @@ class Puente:
             elif canal == 'estacion_estado':
                 f.recibir_estacion(c['estacion'], c['estado'])
             elif canal == 'resultado' and c['equipo'] == self.m.cfg_mision.equipo:
-                f.recibir_resultado(c['estacion'], c['ok'], c['pieza_dejo'])
+                f.recibir_resultado(c['estacion'], c['ok'], c['pieza_dejo'], c.get('motivo'))
 
 
 def mundo(iniciar=True, **kw):
@@ -370,6 +423,25 @@ class TestConLaMaquinaDeLaMision(unittest.TestCase):
             self.assertEqual(correr_mision(m), E.FALLA, msg=nombre)
             self.assertEqual(m.fsm.motivo, motivo, msg=nombre)
             self.assertEqual(m.planta._v, 0.0)
+
+    def test_un_rechazo_pasajero_del_supervisor_se_reintenta_y_la_mision_termina(self):
+        m, e = mundo()
+        e.fallar_proximo('rechazar')
+        self.assertEqual(correr_mision(m), E.FIN)
+        i = e.instantanea()
+        self.assertEqual((i['solicitudes'], i['rechazos'], i['resultados'], i['pit_ok'], i['reintento']), (17, 1, 16, 16, 1))
+        self.assertEqual((m.mision.pits[0].rechazos, m.mision.pits[0].valido), (1, True))
+
+    def test_una_estacion_mas_estricta_que_el_acople_agota_los_dos_reintentos_y_falla(self):
+        m, e = mundo(tol_pos_m=0.02)                                           # el acople se da por bueno hasta 3 cm: volver a medir no cambia la pose
+        self.assertEqual(correr_mision(m), E.FALLA)
+        self.assertEqual((m.fsm.motivo, e.instantanea()['rechazos'], e.ultimo_motivo), ('RESULTADO_NO_OK', 3, 'FUERA_DE_TOLERANCIA'))
+
+    def test_una_estacion_que_tarda_en_esperar_no_provoca_rechazos(self):
+        m, e = mundo(esperando_retardo_s=2.5)
+        self.assertEqual(correr_mision(m), E.FIN)
+        i = e.instantanea()
+        self.assertEqual((i['rechazos'], i['solicitudes'], i['reintento']), (0, 16, 0))
 
     def test_pieza_mala_marca_los_pits_invalidos_y_sigue(self):
         m, e = mundo(modo='pieza_mala', estacion_modo=2)
@@ -481,6 +553,8 @@ class TestNodo(unittest.TestCase):
 
     def test_solicitud_y_resultado_por_los_topicos(self):
         n = self.crear(t_cambio_s=2.0)
+        self.servicio(n, 'iniciar')
+        self.avanzar(n, 0.5)
         n.callback('/granprix/solicitud')(Mensaje(json.dumps(sol(2))))
         self.avanzar(n, 1.0)
         estados = [json.loads(m.data) for m in self.enviados(n, '/granprix/estacion_estado')]
@@ -503,6 +577,8 @@ class TestNodo(unittest.TestCase):
     def test_registro_de_mensajes_y_estado(self):
         with tempfile.TemporaryDirectory() as d:
             n = self.crear(t_cambio_s=0.5, registro_dir=d)
+            self.servicio(n, 'iniciar')
+            self.avanzar(n, 0.5)
             n.callback('/granprix/solicitud')(Mensaje(json.dumps(sol(1))))
             n.callback('/granprix/evento')(Mensaje(json.dumps({'tipo': 'pit_ok', 'estacion': 1})))
             self.avanzar(n, 2.0)

@@ -14,7 +14,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Callable, Deque, Dict, List, Optional
 
-TIPOS = ('inicio', 'estado', 'entrada', 'acople', 'solicitud', 'resultado', 'ignorado', 'reset', 'pit_cerrado', 'pit', 'vuelta',
+TIPOS = ('inicio', 'estado', 'entrada', 'acople', 'solicitud', 'resultado', 'rechazo', 'ignorado', 'reset', 'pit_cerrado', 'pit', 'vuelta',
          'aviso', 'falla', 'fin')
 DURABLES = ('falla', 'fin', 'vuelta')      # estos fuerzan fsync
 

@@ -31,8 +31,8 @@ cualquier estado activo ─(fallo)─> FALLA          FIN / FALLA ─(reiniciar)
 | `ESPERA` | No publica nada (se puede posicionar el robot). Arranca con turno autorizado, bandera verde y enlace vivo; el primer pit es el de E1 | — |
 | `MIDIENDO` | Espera una medición válida del tag con el robot quieto | 4 s |
 | `ACOPLANDO` | `acoplar_pasos` con la medición ya hecha; si queda fuera de 4 cm y 6° → `FALLA` y **no se solicita** | 20 s |
-| `SOLICITANDO` | Publica la solicitud con la pose medida y la pieza que trae; espera si hay un intercambio en curso | 3 s |
-| `ESPERANDO_RESULTADO` | Quieto durante la manipulación; solo acepta el `resultado` de su estación | 15 s |
+| `SOLICITANDO` | Publica la solicitud con la pose medida y la pieza que trae; espera si hay un intercambio en curso o si la estación aún no está `ESPERANDO` (el supervisor la rechazaría) | 3 s |
+| `ESPERANDO_RESULTADO` | Quieto durante la manipulación; solo acepta el `resultado` de su estación. Un `resultado` no ok es un **rechazo**: vuelve a `MIDIENDO` (ver abajo) | 15 s |
 | `RECALIBRANDO` | Segunda medición, reset de pose (reintenta si `/odom` no llegó), `CalibradorTramo.cerrar_parada`, cierra el pit en la misión | 6 s |
 | `SALIENDO` | Espera que ninguna estación esté `CAMBIANDO`, planifica el tramo con las escalas nuevas y arranca el ejecutor | 3 s |
 | `NAVEGANDO` | Ejecuta el tramo (lazo abierto); al terminar guarda el comando efectivo y pasa a `MIDIENDO` | tramo + margen 8 s |
@@ -46,7 +46,8 @@ La secuencia exacta de estados de las 16 paradas está fijada por una prueba.
 Una vuelta son los pits E1, E2, E3 y E4; cierra al terminar el de E4 y la misión, al cerrar la última (16 pits). Piezas (`mision.yaml`): E1 trae vacío y deja A; E2 A→B; E3 B→C; E4 C→vacío; la cadena debe cerrar o el cargador falla. Por pit se guarda una fila de `pits.csv` (vuelta, estación, llegada, tiempo de pit, errores antes y después, correcciones, reintentos, `cd`, `ca`, piezas, validez), lo que pide la evidencia salvo el video y el bag.
 
 - `resultado ok` con otra pieza de la esperada: el pit se marca inválido (`PIEZA_INESPERADA`), se avisa y **la misión sigue** (se necesitan 3 vueltas válidas de 4).
-- `resultado` no ok: `FALLA` (`RESULTADO_NO_OK`) sin avanzar la misión.
+- `resultado` no ok (rechazo del supervisor): **no es una intervención**; el carro vuelve a medir, acoplar y solicitar. Cada parada tiene **2 reintentos** (`reintentos_por_parada`) que se **comparten** entre las correcciones de acople y los rechazos: un acople que ya gastó un reintento deja uno solo para rechazos [Probable: lectura estricta del límite del reto, no confirmada con el docente]. Agotados → `FALLA` (`RESULTADO_NO_OK`) sin avanzar la misión. Cada rechazo cuenta en `reintentos` de `pits.csv` y emite el evento `rechazo`.
+- La solicitud solo se envía con la estación en `ESPERANDO` (`solicitar_solo_si_esperando`, si la estación no publica estado se envía igual). Si no llega a `ESPERANDO` en 3 s → `FALLA` (`TIMEOUT_SOLICITANDO`) sin enviar nada, para no gastar reintentos contra un rechazo seguro.
 - Tiempo de pit = desde que termina el tramo hasta que arranca el siguiente. Pasar de 10 s **se cuenta** (`pits_lentos`) pero no aborta: abortar sería peor que un pit lento.
 
 ## Seguridad de nuestra lógica
@@ -77,7 +78,7 @@ Lo que hace: impedir movimientos no autorizados, impedir la salida durante un in
 
 ## Probar con el carro sin JetCobot: estación y curso falsos
 
-`carrito/nodos/estacion_falsa.py` hace de Race Control (turno, bandera, enlace) y de las cuatro estaciones (estado y resultado) con los mismos tópicos y JSON que usa el adaptador. **No mueve ningún brazo.** Por defecto no da el turno por sí sola: `ros2 service call /estacion_falsa/iniciar std_srvs/srv/Trigger`. Parámetros: `t_cambio_s` (5,8), `modo` (`ok`, `rechazar`, `no_responder`, `pieza_mala`, `offline`), `estacion_modo` (limita el modo a una estación), `turno_equipo`, `autoiniciar_s`, `registro_dir`. Servicios: `iniciar`, `retirar_turno`, `roja`, `verde`, `cortar_enlace`, `silenciar_enlace`, `restaurar_enlace`, `fallar_proximo`, `no_responder_proximo`. Valida con la pose que el carro **reporta** (tolerancia 4 cm y 6°, pieza que trae, turno), no con la verdadera: mide con cinta. Los tiempos son supuestos. Uso paso a paso en [`guion_laboratorio.md`](guion_laboratorio.md).
+`carrito/nodos/estacion_falsa.py` hace de Race Control (turno, bandera, enlace) y de las cuatro estaciones (estado y resultado) con los mismos tópicos y JSON que usa el adaptador. **No mueve ningún brazo.** Por defecto no da el turno por sí sola: `ros2 service call /estacion_falsa/iniciar std_srvs/srv/Trigger`. Parámetros: `t_cambio_s` (5,8), `modo` (`ok`, `rechazar`, `no_responder`, `pieza_mala`, `offline`), `estacion_modo` (limita el modo a una estación), `turno_equipo`, `autoiniciar_s`, `registro_dir`. Servicios: `iniciar`, `retirar_turno`, `roja`, `verde`, `cortar_enlace`, `silenciar_enlace`, `restaurar_enlace`, `fallar_proximo`, `no_responder_proximo`. Sigue el supervisor de [`02-jetcobot-estacion.md`](../vendor/granprix/docs/arquitectura/02-jetcobot-estacion.md): estados `LIBRE → ESPERANDO` (hay turno) `→ CAMBIANDO → LISTA → ESPERANDO`, y solo acepta una solicitud con la estación en `ESPERANDO`. Valida en este orden: estado, equipo, pose (4 cm y 6°), bandera roja y pieza que trae. Un rechazo es inmediato (`t_rechazo_s`, 0,2 s), publica `resultado` con `ok=false` y `motivo`, y la estación sigue en `ESPERANDO`. Usa la pose que el carro **reporta**, no la verdadera: mide con cinta. Parámetro extra `esperando_retardo_s` para simular una estación que tarda en estar lista. Los tiempos son supuestos. Uso paso a paso en [`guion_laboratorio.md`](guion_laboratorio.md).
 
 ## Interfaz ROS 2 (nombres nuestros, provisionales)
 
@@ -116,6 +117,6 @@ Planta continua con `cd = 1.01` y `ca = 1.09` ocultos, ruido del 1 % en cada mov
 1. **El pit de 10 s solo cabe sin corrección** [Probable]: con un intercambio de 5.8 s quedan ~2 s para medir, y una corrección cuesta 4–5 s. Más de la mitad de los pits simulados se pasan. Lo que lo arregla es llegar mejor (escalas del día 3, reset de pose), no el acople.
 2. **Arrancar con las escalas caracterizadas** es obligatorio en la práctica: con 1.0 y un giro 9 % mal la primera parada llega fuera de alcance.
 3. **Todos los plazos y umbrales propios son provisionales**; los de medición (`espera_s`, `lecturas`) dependen del retardo real de la cámara y de `/odom`.
-4. **Interfaces con el curso sin confirmar:** nombres de tópicos y forma del estado de la estación (si publica `ESPERANDO` antes de la solicitud no se exige; solo se bloquea si hay un intercambio en curso).
+4. **Interfaces con el curso sin confirmar:** nombres de tópicos y forma del estado de la estación. Si el estado no se publica no se bloquea la solicitud; si se publica y no es `ESPERANDO`, se espera (hasta 3 s).
 5. **Preguntas abiertas:** qué significa exactamente `autorizado` (¿calentamiento incluido?), si tras una bandera roja la carrera se reanuda (aquí es `FALLA` y hay que reiniciar), y qué cuenta la rúbrica como pit de más de 10 s.
 6. **Sin telemetría de pose en mapa:** se envía la odometría (`/odom`); el contrato no fija el contenido de `pose`.

@@ -34,6 +34,7 @@ class Tiempos:
     medicion_post_s: float = 2.0
     reset_reintentos: int = 3
     reset_espera_s: float = 0.3
+    reintentos_por_parada: int = 2        # reto: máximo 2; lo gastan los reintentos del acople y los rechazos de la estación
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,7 @@ class Seguridad:
     requiere_enlace: bool = True
     enlace_max_s: float = 2.0
     estacion_offline_aborta: bool = True
+    solicitar_solo_si_esperando: bool = True      # el supervisor solo acepta con la estación en ESPERANDO (doc. 02)
 
 
 @dataclass(frozen=True)
@@ -68,6 +70,8 @@ class ConfigMision:
                    *(getattr(t, k) for k in LIMITES_ESTADO))
         if not all(v > 0 for v in valores) or t.reset_reintentos < 0:
             raise ValueError('los plazos deben ser positivos')
+        if not 0 <= t.reintentos_por_parada <= 2:
+            raise ValueError('reintentos_por_parada debe estar entre 0 y 2 (reto: máximo dos)')
         if t.tanda_max_s > 720.0 or t.pit_max_s > 10.0:
             raise ValueError('la tanda no puede pasar de 720 s ni el pit de 10 s (reglas del reto)')
 
@@ -105,6 +109,7 @@ class RegistroPit:
     err_ang_post_deg: Optional[float] = None
     correcciones: int = 0
     reintentos: int = 0
+    rechazos: int = 0
     cd: Optional[float] = None
     ca: Optional[float] = None
     pieza_esperada: Optional[str] = None
@@ -202,14 +207,18 @@ def cargar_mision(ruta: Optional[str] = None) -> ConfigMision:
         piezas.append((n, ye.texto(e, 'trae', f'mision.estaciones.E{n}', True), ye.texto(e, 'deja', f'mision.estaciones.E{n}', True)))
     t = ye.seccion(d, 'tiempos', 'mision')
     ye.exigir_claves(t, 'mision.tiempos', ('tanda_max_s', 'pit_max_s', 'medicion_post_s', 'reset_reintentos', 'reset_espera_s',
-                                           *LIMITES_ESTADO))
-    tiempos = Tiempos(**{k: ye.numero(t, k, 'mision.tiempos', 0, exclusivo_min=True) for k in t if k != 'reset_reintentos'},
-                      reset_reintentos=ye.entero(t, 'reset_reintentos', 'mision.tiempos', 0, 10))
+                                           'reintentos_por_parada', *LIMITES_ESTADO))
+    enteros = ('reset_reintentos', 'reintentos_por_parada')
+    tiempos = Tiempos(**{k: ye.numero(t, k, 'mision.tiempos', 0, exclusivo_min=True) for k in t if k not in enteros},
+                      reset_reintentos=ye.entero(t, 'reset_reintentos', 'mision.tiempos', 0, 10),
+                      reintentos_por_parada=ye.entero(t, 'reintentos_por_parada', 'mision.tiempos', 0, 2))
     s = ye.seccion(d, 'seguridad', 'mision')
-    ye.exigir_claves(s, 'mision.seguridad', ('requiere_autorizacion', 'requiere_enlace', 'enlace_max_s', 'estacion_offline_aborta'))
+    ye.exigir_claves(s, 'mision.seguridad', ('requiere_autorizacion', 'requiere_enlace', 'enlace_max_s', 'estacion_offline_aborta',
+                                             'solicitar_solo_si_esperando'))
     seg = Seguridad(ye.booleano(s, 'requiere_autorizacion', 'mision.seguridad'), ye.booleano(s, 'requiere_enlace', 'mision.seguridad'),
                     ye.numero(s, 'enlace_max_s', 'mision.seguridad', 0, 30, exclusivo_min=True),
-                    ye.booleano(s, 'estacion_offline_aborta', 'mision.seguridad'))
+                    ye.booleano(s, 'estacion_offline_aborta', 'mision.seguridad'),
+                    ye.booleano(s, 'solicitar_solo_si_esperando', 'mision.seguridad'))
     try:
         return ConfigMision(ye.entero(d, 'equipo', 'mision', 1, 99), ye.entero(d, 'vueltas', 'mision', 1, 10), tuple(piezas), tiempos, seg)
     except ValueError as e:

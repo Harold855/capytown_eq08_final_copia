@@ -61,6 +61,21 @@ class TestConfig(unittest.TestCase):
         c = cargar_texto(yaml_con({'vueltas: 4': 'vueltas: 2', 'enlace_max_s: 2.0': 'enlace_max_s: 1.5', 'reset_reintentos: 3': 'reset_reintentos: 0'}))
         self.assertEqual((c.vueltas, c.seguridad.enlace_max_s, c.tiempos.reset_reintentos), (2, 1.5, 0))
 
+    def test_reintentos_por_parada_y_compuerta_de_esperando(self):
+        c = ConfigMision()
+        self.assertEqual((c.tiempos.reintentos_por_parada, c.seguridad.solicitar_solo_si_esperando), (2, True))
+        c = cargar_texto(yaml_con({'reintentos_por_parada: 2': 'reintentos_por_parada: 1', 'solicitar_solo_si_esperando: true': 'solicitar_solo_si_esperando: false'}))
+        self.assertEqual((c.tiempos.reintentos_por_parada, c.seguridad.solicitar_solo_si_esperando), (1, False))
+        for cambios in ({'reintentos_por_parada: 2': 'reintentos_por_parada: 3'}, {'reintentos_por_parada: 2': 'reintentos_por_parada: -1'},
+                        {'solicitar_solo_si_esperando: true': 'solicitar_solo_si_esperando: si'}):
+            with self.assertRaises(ErrorYaml, msg=cambios):
+                cargar_texto(yaml_con(cambios))
+        with self.assertRaises(ValueError):
+            ConfigMision(tiempos=Tiempos(reintentos_por_parada=3))
+
+    def test_el_yaml_del_repositorio_es_la_configuracion_por_defecto(self):
+        self.assertEqual(cargar_mision(), ConfigMision())
+
 
 class TestMision(unittest.TestCase):
     def pit(self, m, ok=True, pieza='auto', t=100.0):

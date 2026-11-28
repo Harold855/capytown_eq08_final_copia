@@ -157,7 +157,8 @@ Haz las pruebas en este orden, cada una con el vigilante listo:
 | b | **Sin turno no arranca** | No llames a `iniciar`; espera 30 s | Se queda en `ESPERA` y no publica velocidad |
 | c | **Parada por orden del curso** | Robot en el suelo, en marcha: `ros2 service call /estacion_falsa/roja std_srvs/srv/Trigger`; en otras corridas `/estacion_falsa/retirar_turno`, `/estacion_falsa/cortar_enlace`, `/estacion_falsa/silenciar_enlace` | Termina en `FALLA` con el motivo esperado (`BANDERA_ROJA`, `SIN_AUTORIZACION`, `ENLACE_PERDIDO`) y el robot **para** |
 | d | **Parada manual** | `ros2 service call /maquina_pit/parar std_srvs/srv/Trigger` en marcha | `FALLA` (`PARADA_MANUAL`) al instante |
-| e | **Fallas de la estación** | Relanza la falsa con `-p modo:=rechazar`, `no_responder` o `offline` | `RESULTADO_NO_OK`, `TIMEOUT_ESPERANDO_RESULTADO` (a los 15 s) y `ESTACION_OFFLINE`; el robot queda quieto |
+| e | **Fallas de la estación** | Relanza la falsa con `-p modo:=rechazar`, `no_responder` o `offline` | `RESULTADO_NO_OK` (tras 3 solicitudes: el carro reintenta 2 veces), `TIMEOUT_ESPERANDO_RESULTADO` (a los 15 s) y `ESTACION_OFFLINE`; el robot queda quieto |
+| e2 | **Rechazo pasajero** | Con la misión en marcha y antes de la primera parada: `ros2 service call /estacion_falsa/fallar_proximo std_srvs/srv/Trigger` | La primera solicitud es rechazada, el carro vuelve a medir y solicita otra vez, y la misión sigue; `reintentos` = 1 en esa fila de `pits.csv` |
 | f | **Una vuelta** | `modo:=ok`, 1 vuelta: E1 → E2 → E3 → E4 | 4 pits válidos; mide con cinta la pose de llegada en cada parada |
 | g | **Cuatro vueltas** | `mision.yaml` original (solo si f salió limpia y hay batería) | `FIN`; mira `pits.csv`, `paradas.csv` y la evidencia |
 

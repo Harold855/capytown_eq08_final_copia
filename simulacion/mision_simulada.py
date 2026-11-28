@@ -28,10 +28,12 @@ DT = 0.05
 
 
 class EstacionSimulada:
-    """Recibe la solicitud, 'cambia' la pieza durante `t_cambio` s y responde. Valida con la pose verdadera."""
+    """Recibe la solicitud y responde. Valida con la pose VERDADERA. Si acepta: CAMBIANDO durante `t_cambio`, resultado, LISTA y de
+    vuelta a ESPERANDO. Si rechaza: resultado ok=false a los 0.2 s y la estación sigue en ESPERANDO (como el supervisor del docente)."""
 
-    def __init__(self, mundo: 'Mundo', t_cambio: float = 5.8) -> None:
-        self.mundo, self.t_cambio, self.pendiente, self.respuesta = mundo, t_cambio, None, None   # respuesta(est, ok, deja) -> (ok, deja)
+    def __init__(self, mundo: 'Mundo', t_cambio: float = 5.8, t_rechazo: float = 0.2, t_liberar: float = 0.5) -> None:
+        self.mundo, self.t_cambio, self.t_rechazo, self.t_liberar = mundo, t_cambio, t_rechazo, t_liberar
+        self.pendiente, self.libera, self.respuesta = None, None, None   # respuesta(est, ok, deja) -> (ok, deja)
         self.solicitudes: List[Tuple[int, dict]] = []
 
     def solicitud(self, estacion: int, pose, pieza_trae) -> None:
@@ -40,15 +42,23 @@ class EstacionSimulada:
         ok = acople_valido(*verdadera)
         deja = next(d for e, _, d in self.mundo.cfg_mision.piezas if e == estacion)
         ok, deja = self.respuesta(estacion, ok, deja) if self.respuesta else (ok, deja)
-        self.pendiente = (self.mundo.t + self.t_cambio, estacion, ok, deja)
-        self.mundo.fsm.recibir_estacion(estacion, 'CAMBIANDO')
+        t = self.mundo.t
+        self.pendiente = (t + (self.t_cambio if ok else self.t_rechazo), estacion, ok, deja)
+        if ok:
+            self.mundo.fsm.recibir_estacion(estacion, 'CAMBIANDO')
 
     def avanzar(self) -> None:
-        if self.pendiente and self.mundo.t >= self.pendiente[0]:
+        f, t = self.mundo.fsm, self.mundo.t
+        if self.pendiente and t >= self.pendiente[0]:
             _, estacion, ok, deja = self.pendiente
             self.pendiente = None
-            self.mundo.fsm.recibir_estacion(estacion, 'LISTA')
-            self.mundo.fsm.recibir_resultado(estacion, ok, deja if ok else None)
+            if ok:
+                f.recibir_estacion(estacion, 'LISTA')
+                self.libera = (t + self.t_liberar, estacion)
+            f.recibir_resultado(estacion, ok, deja if ok else None, None if ok else 'RECHAZADA')
+        if self.libera and t >= self.libera[0]:
+            f.recibir_estacion(self.libera[1], 'ESPERANDO')
+            self.libera = None
 
 
 class PuertoSimulado:
@@ -102,6 +112,8 @@ class Mundo:
         medidor = MedidorTag(lambda: self.t, lambda s: None)
         self.fsm = MaquinaPit(self.mision, mov, self.cfg_acople, CalibradorTramo(estimador), medidor, self.planta, self.puerto,
                               lambda: self.t, lambda: 1.7e9 + self.t, odom_ok, eventos)
+        for n in (1, 2, 3, 4):                                  # el curso ya dio el turno: las estaciones esperan
+            self.fsm.recibir_estacion(n, 'ESPERANDO')
         self.tag_visto, self.tag_activo, self.vel = 0, True, []
         publicar = self.planta.publicar
 

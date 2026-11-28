@@ -143,6 +143,14 @@ class TestEntradas(Base):
         self.cb('/granprix/resultado')(js(estacion=1, equipo=8, ok=True, pieza_dejo='A', t_cambio=5.8))
         self.assertEqual(n.fsm._res, (True, 'A'))
 
+    def test_un_resultado_rechazado_con_motivo_queda_en_el_registro(self):
+        n = self.crear()
+        n.fsm.estado = E.ESPERANDO_RESULTADO
+        self.cb('/granprix/resultado')(js(estacion=1, equipo=8, ok=False, pieza_dejo=None, t_cambio=None, motivo='FUERA_DE_TOLERANCIA'))
+        self.assertEqual(n.fsm._res, (False, None))
+        e = [x for x in n.fsm.eventos.eventos if x.tipo == 'resultado'][-1]
+        self.assertEqual((e.motivo, e.datos['ok']), ('FUERA_DE_TOLERANCIA', False))
+
     def test_tag_se_convierte_a_pose_en_el_dock_de_la_estacion_actual(self):
         n = self.crear()
         self.cb('/tag/pose')(tag_msg(-0.05, 0.02, 4.0))

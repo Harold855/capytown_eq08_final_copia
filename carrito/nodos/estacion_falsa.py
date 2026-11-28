@@ -5,9 +5,11 @@
     ros2 service call /estacion_falsa/iniciar std_srvs/srv/Trigger        # da el turno: el carro arranca
 
 Hace de Race Control (turno, bandera, enlace) y de las cuatro estaciones (estado y resultado) con los MISMOS nombres de tópico y
-JSON que usa `adaptador_ros.py`. NO mueve ningún brazo ni cambia ninguna pieza: solo responde. Valida lo que la estación real puede
-saber, es decir, la pose que el carro REPORTA (no la verdadera): mide con cinta si quieres saber si llegó bien. Por defecto NO da
-el turno por sí sola (falla cerrada): hay que llamar a `~/iniciar` o usar `autoiniciar_s`. Núcleo en Python puro; el nodo es delgado.
+JSON que usa `adaptador_ros.py`. NO mueve ningún brazo ni cambia ninguna pieza: solo responde. Sigue la especificación del supervisor
+(docs/arquitectura/02 del docente): estados LIBRE -> ESPERANDO (hay turno) -> CAMBIANDO -> LISTA, y una solicitud solo se acepta con
+la estación en ESPERANDO; si no, o si el equipo, la pose (4 cm y 6°), la pieza o la bandera fallan, se RECHAZA de inmediato con un
+resultado ok=false y la estación sigue en ESPERANDO (el carro reintenta). Valida lo que la estación real puede saber, es decir, la pose
+que el carro REPORTA (no la verdadera): mide con cinta. Por defecto NO da el turno por sí sola (falla cerrada): `~/iniciar` o `autoiniciar_s`. Núcleo en Python puro; el nodo es delgado.
 Los nombres de tópicos son los provisionales del adaptador, no los del curso (aún sin publicar).
 """
 import json
@@ -28,7 +30,7 @@ MODOS = ('ok', 'rechazar', 'no_responder', 'pieza_mala', 'offline')
 HOLGURA_S = 0.05                                                              # medio periodo del temporizador (10 Hz): evita que el redondeo alargue el reenvío
 INTERVALO = {'enlace': 0.5, 'turno': 1.0, 'bandera': 1.0, 'estado': 1.0}      # reenvío periódico, como un tópico retenido
 PARAMETROS = {
-    't_cambio_s': 5.8, 't_liberar_s': 0.5, 'modo': 'ok', 'estacion_modo': 0, 'turno_equipo': 0, 'autoiniciar_s': -1.0,
+    't_cambio_s': 5.8, 't_liberar_s': 0.5, 't_rechazo_s': 0.2, 'esperando_retardo_s': 0.0, 'modo': 'ok', 'estacion_modo': 0, 'turno_equipo': 0, 'autoiniciar_s': -1.0,
     'tanda': 'prueba', 'resultado_antes_de_estado': True, 'hz': 10.0, 'mision_yaml': '', 'registro_dir': '',
     'turno_topic': '/granprix/turno', 'bandera_topic': '/granprix/bandera', 'enlace_topic': '/granprix/enlace',
     'estacion_topic': '/granprix/estacion_estado', 'resultado_topic': '/granprix/resultado',
@@ -42,6 +44,8 @@ class ConfigFalsa:
     piezas: tuple = ConfigMision().piezas                 # (estación, trae, deja)
     t_cambio_s: float = 5.8                               # lo que tardaría el intercambio real (supuesto)
     t_liberar_s: float = 0.5                              # de LISTA a LIBRE
+    t_rechazo_s: float = 0.2                              # lo que tarda el supervisor en rechazar una solicitud
+    esperando_retardo_s: float = 0.0                      # retraso entre tener el turno y pasar a ESPERANDO (el carro puede llegar antes)
     tol_pos_m: float = TOL_POS_M
     tol_ang_deg: float = TOL_ANG_DEG
     modo: str = 'ok'
@@ -56,8 +60,9 @@ class ConfigFalsa:
             raise ValueError(f'modo debe ser uno de {MODOS}')
         if self.estacion_modo not in (None, 1, 2, 3, 4):
             raise ValueError('estacion_modo debe ser None o 1 a 4')
-        if not all(isinstance(v, (int, float)) and math.isfinite(v) and v >= 0 for v in (self.t_cambio_s, self.t_liberar_s)):
-            raise ValueError('t_cambio_s y t_liberar_s deben ser finitos y no negativos')
+        if not all(isinstance(v, (int, float)) and math.isfinite(v) and v >= 0
+                   for v in (self.t_cambio_s, self.t_liberar_s, self.t_rechazo_s, self.esperando_retardo_s)):
+            raise ValueError('los tiempos deben ser finitos y no negativos')
         if self.autoiniciar_s is not None and not (math.isfinite(self.autoiniciar_s) and self.autoiniciar_s >= 0):
             raise ValueError('autoiniciar_s debe ser None o >= 0')
 
@@ -88,18 +93,19 @@ class EntornoFalso:
         self.cfg, self._reloj, self._ts = cfg, reloj, reloj_ts
         self._t0 = reloj()
         self.turno, self.bandera_actual, self.enlace_ok, self.enlace_mudo = False, 'verde', True, False
-        self._turno_retirado = False
+        self._turno_retirado, self._t_turno = False, None
         self.estados = {n: 'LIBRE' for n in (1, 2, 3, 4)}
+        self._libre_desde = {n: self._t0 for n in self.estados}
         for n in self.estados:
             if cfg.modo == 'offline' and cfg.estacion_modo in (None, n):
                 self.estados[n] = 'OFFLINE'
         self._pend, self._ult, self._proximo = {}, {}, None
-        self.n = {'solicitudes': 0, 'descartadas': 0, 'ocupada': 0, 'resultados': 0, 'pit_ok': 0, 'reintento': 0, 'vueltas': 0}
+        self.n = {'solicitudes': 0, 'descartadas': 0, 'ocupada': 0, 'rechazos': 0, 'resultados': 0, 'pit_ok': 0, 'reintento': 0, 'vueltas': 0}
         self.vueltas, self.ultima_solicitud, self.ultimo_motivo = [], None, None
 
     # ---------------------------------------------------------------- Race Control falso
     def iniciar(self):
-        self.turno, self._turno_retirado = True, False
+        self.turno, self._turno_retirado, self._t_turno = True, False, self._reloj()
 
     def retirar_turno(self):
         self.turno, self._turno_retirado = False, True
@@ -138,10 +144,15 @@ class EntornoFalso:
         modo, self._proximo = self._proximo or (self.cfg.modo if self.cfg.estacion_modo in (None, estacion) else 'ok'), None
         ok, deja, motivo = self._decidir(modo, estacion, equipo, dx, dy, dth, pieza)
         self.ultima_solicitud = {'estacion': estacion, 'equipo': equipo, 'dx': dx, 'dy': dy, 'dth': dth, 'pieza_trae': pieza, 'modo': modo,
-                                 'ok': ok, 'motivo': motivo}
-        self.estados[estacion] = 'CAMBIANDO'
-        self._pend[estacion] = {'t_fin': self._reloj() + self.cfg.t_cambio_s, 'fase': 'cambiando', 'ok': ok, 'deja': deja, 'motivo': motivo,
-                                'equipo': equipo, 'responde': modo != 'no_responder'}
+                                 'ok': ok, 'motivo': motivo, 'estado_al_recibir': self.estados[estacion]}
+        t = self._reloj()
+        if ok:                                            # se acepta: la estación pasa a CAMBIANDO
+            self.estados[estacion] = 'CAMBIANDO'
+            self._pend[estacion] = {'t_fin': t + self.cfg.t_cambio_s, 'fase': 'cambiando', 'ok': True, 'deja': deja, 'motivo': None,
+                                    'equipo': equipo, 'responde': modo != 'no_responder'}
+        else:                                             # se rechaza de inmediato; la estación no cambia de estado
+            self._pend[estacion] = {'t_fin': t + self.cfg.t_rechazo_s, 'fase': 'rechazando', 'ok': False, 'deja': None, 'motivo': motivo,
+                                    'equipo': equipo, 'responde': True}
         return self._motivo(motivo)
 
     def _motivo(self, m):
@@ -149,18 +160,23 @@ class EntornoFalso:
         return m
 
     def _decidir(self, modo, estacion, equipo, dx, dy, dth, pieza):
+        """Mismo orden que el supervisor: estado, turno, pose, bandera (y la pieza, que valida la estrategia)."""
         c = self.cfg
         if modo == 'rechazar':
             return False, None, 'RECHAZO_FORZADO'
-        if modo == 'no_responder':
-            return True, None, None
+        if self.estados[estacion] != 'ESPERANDO':
+            return False, None, 'NO_ESPERANDO'
         if equipo != (c.turno_equipo if c.turno_equipo is not None else c.equipo):
             return False, None, 'SIN_TURNO'
         if math.hypot(dx, dy) > c.tol_pos_m + 1e-9 or abs(dth) > c.tol_ang_deg + 1e-9:
             return False, None, 'FUERA_DE_TOLERANCIA'
+        if self.bandera_actual == 'roja':
+            return False, None, 'BANDERA_ROJA'
         _, trae, deja = next(p for p in c.piezas if p[0] == estacion)
         if pieza != trae:
             return False, None, 'PIEZA_INESPERADA'
+        if modo == 'no_responder':
+            return True, None, None
         return True, ('Z' if modo == 'pieza_mala' else deja), None
 
     def evento(self, msg):
@@ -190,12 +206,18 @@ class EntornoFalso:
         t, out = self._reloj(), []
         a = self.cfg.autoiniciar_s
         if a is not None and not self.turno and not self._turno_retirado and t - self._t0 >= a:
-            self.turno = True
+            self.turno, self._t_turno = True, t
         for n, ex in list(self._pend.items()):
+            if ex['fase'] == 'rechazando' and t >= ex['t_fin']:
+                out.append(('resultado', {**self._base(), 'estacion': n, 'equipo': ex['equipo'], 'ok': False, 'pieza_dejo': None,
+                                          't_cambio': None, 'motivo': ex['motivo']}))
+                self.n['rechazos'] += 1
+                del self._pend[n]
+                continue
             if ex['fase'] == 'cambiando' and t >= ex['t_fin'] and ex['responde']:
                 resultado = ('resultado', {**self._base(), 'estacion': n, 'equipo': ex['equipo'], 'ok': ex['ok'], 'pieza_dejo': ex['deja'],
                                            't_cambio': self.cfg.t_cambio_s, 'motivo': ex['motivo']})
-                self.estados[n] = 'LISTA' if ex['ok'] else 'LIBRE'
+                self.estados[n] = 'LISTA'
                 self._ult.pop(f'estado{n}', None)
                 nuevo = self._estado_msg(n)
                 out.extend([resultado, nuevo] if self.cfg.resultado_antes_de_estado else [nuevo, resultado])
@@ -203,8 +225,16 @@ class EntornoFalso:
                 self.n['resultados'] += 1
                 ex['fase'], ex['t_libre'] = 'lista', t + self.cfg.t_liberar_s
             if ex['fase'] == 'lista' and t >= ex['t_libre']:
-                self.estados[n] = 'LIBRE'
+                self.estados[n], self._libre_desde[n] = 'LIBRE', t
                 del self._pend[n]
+        for n, estado in self.estados.items():            # LIBRE <-> ESPERANDO según haya turno (y tras el retardo)
+            if n in self._pend or estado not in ('LIBRE', 'ESPERANDO'):
+                continue
+            if self.turno and estado == 'LIBRE' and self._t_turno is not None \
+                    and t - max(self._libre_desde[n], self._t_turno) >= self.cfg.esperando_retardo_s - 1e-9:
+                self.estados[n] = 'ESPERANDO'
+            elif not self.turno and estado == 'ESPERANDO':
+                self.estados[n], self._libre_desde[n] = 'LIBRE', t
         if not self.enlace_mudo:
             self._emitir(out, 'enlace', self.enlace_ok, 'enlace', self.enlace_ok)
         self._emitir(out, 'turno', self.turno, 'turno', {**self._base(), 'autorizado': self.turno, 'tanda': self.cfg.tanda})
@@ -243,7 +273,8 @@ def _clase_nodo():
             p = {nombre: self.get_parameter(nombre).value for nombre in PARAMETROS}
             self.p = p
             mision = cargar_mision(p['mision_yaml'] or None)
-            cfg = ConfigFalsa(mision.equipo, mision.piezas, float(p['t_cambio_s']), float(p['t_liberar_s']), modo=p['modo'],
+            cfg = ConfigFalsa(mision.equipo, mision.piezas, float(p['t_cambio_s']), float(p['t_liberar_s']), t_rechazo_s=float(p['t_rechazo_s']),
+                              esperando_retardo_s=float(p['esperando_retardo_s']), modo=p['modo'],
                               estacion_modo=int(p['estacion_modo']) or None, turno_equipo=int(p['turno_equipo']) or None,
                               autoiniciar_s=None if p['autoiniciar_s'] < 0 else float(p['autoiniciar_s']), tanda=p['tanda'],
                               resultado_antes_de_estado=bool(p['resultado_antes_de_estado']))

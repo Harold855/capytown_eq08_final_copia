@@ -7,11 +7,13 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 RAIZ = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(RAIZ))
 from carrito.granprix_carrito import maquina_pit as mp
 from carrito.granprix_carrito.maquina_pit import Estado, SalidaSegura, TRANSICIONES
+from carrito.granprix_carrito.eventos_mision import RegistroEventos
 from carrito.granprix_carrito.mision import ConfigMision, Tiempos
 from simulacion.mision_simulada import Mundo
 
@@ -270,19 +272,19 @@ class TestIntercambio(unittest.TestCase):
     def test_no_sale_mientras_alguna_estacion_siga_cambiando(self):
         m = Mundo(**CALIBRADO)
         hasta(m, E.SALIENDO)
-        m.fsm.recibir_estacion(1, 'CAMBIANDO')
+        m.fsm.recibir_estacion(3, 'CAMBIANDO')                                   # otra estación (la 1 la maneja la simulada)
         t0 = m.t
         avanzar(m, 2.0)
         self.assertEqual(m.fsm.estado, E.SALIENDO)
         self.assertTrue(solo_ceros(m, t0))
-        m.fsm.recibir_estacion(1, 'LISTA')
+        m.fsm.recibir_estacion(3, 'LISTA')
         avanzar(m, 0.2)
         self.assertEqual(m.fsm.estado, E.NAVEGANDO)
 
     def test_si_el_intercambio_no_termina_falla_por_plazo(self):
         m = Mundo(**CALIBRADO)
         hasta(m, E.SALIENDO)
-        m.fsm.recibir_estacion(1, 'CAMBIANDO')
+        m.fsm.recibir_estacion(3, 'CAMBIANDO')
         avanzar(m, 4.0)
         self.assertEqual((m.fsm.estado, m.fsm.motivo), (E.FALLA, 'TIMEOUT_SALIENDO'))
         self.assertEqual(m.planta._v, 0.0)
@@ -298,16 +300,125 @@ class TestIntercambio(unittest.TestCase):
 
 
 class TestResultado(unittest.TestCase):
-    def test_resultado_no_ok_es_falla_y_no_avanza_la_mision(self):
+    def rechazar(self, m, veces, est=2):
+        """La estación rechaza las primeras `veces` solicitudes de `est` (como el supervisor: respuesta inmediata ok=false)."""
+        cuenta = []
+
+        def respuesta(e, ok, deja):
+            if e == est and len(cuenta) < veces:
+                cuenta.append(e)
+                return False, None
+            return ok, deja
+        m.estacion.respuesta = respuesta
+
+    def test_un_rechazo_no_es_falla_ni_intervencion_el_carrito_reintenta(self):
         m = Mundo(**CALIBRADO)
-        m.estacion.respuesta = lambda est, ok, deja: (False, None) if est == 2 else (ok, deja)
+        self.rechazar(m, 1)
+        m.correr()
+        self.assertEqual(m.fsm.estado, E.FIN)
+        self.assertEqual(len(m.estacion.solicitudes), 17)
+        pit = m.mision.pits[1]
+        self.assertEqual((pit.estacion, pit.valido, pit.rechazos, pit.reintentos), (2, True, 1, 1))
+        self.assertEqual(m.mision.pits_invalidos, 0)
+        tipos = [t for _, t, _ in m.puerto.eventos]
+        self.assertEqual((tipos.count('reintento'), tipos.count('intervencion'), tipos.count('pit_ok')), (1, 0, 16))
+
+    def test_dos_rechazos_seguidos_aun_se_toleran_y_el_tercero_es_falla(self):
+        m = Mundo(**CALIBRADO)
+        self.rechazar(m, 2)
+        m.correr()
+        self.assertEqual((m.fsm.estado, len(m.estacion.solicitudes), m.mision.pits[1].rechazos), (E.FIN, 18, 2))
+        m = Mundo(**CALIBRADO)
+        self.rechazar(m, 99)
+        m.correr()
+        self.assertEqual((m.fsm.estado, m.fsm.motivo, m.mision.estacion), (E.FALLA, 'RESULTADO_NO_OK', 2))
+        self.assertEqual(len(m.estacion.solicitudes), 4)                          # una de la estación 1 y tres de la 2
+        self.assertFalse(m.mision.pits[-1].valido)
+        self.assertEqual((m.mision.pits[-1].motivo, m.mision.pits[-1].rechazos), ('RESULTADO_NO_OK', 2))
+        self.assertTrue(solo_ceros(m, m.t - 1.0))
+
+    def test_el_presupuesto_de_reintentos_se_cuenta_por_parada(self):
+        m = Mundo(cfg_mision=cfg_tiempos(reintentos_por_parada=1), **CALIBRADO)
+        self.rechazar(m, 1)
+        m.correr()
+        self.assertEqual(m.fsm.estado, E.FIN)
+        m = Mundo(cfg_mision=cfg_tiempos(reintentos_por_parada=1), **CALIBRADO)
+        self.rechazar(m, 2)
         m.correr()
         self.assertEqual((m.fsm.estado, m.fsm.motivo), (E.FALLA, 'RESULTADO_NO_OK'))
-        self.assertEqual(m.mision.estacion, 2)
+        m = Mundo(cfg_mision=cfg_tiempos(reintentos_por_parada=0), **CALIBRADO)
+        self.rechazar(m, 1)
+        m.correr()
+        self.assertEqual((m.fsm.estado, m.fsm.motivo), (E.FALLA, 'RESULTADO_NO_OK'))
+
+    def test_el_presupuesto_se_renueva_en_cada_parada(self):
+        m = Mundo(**CALIBRADO)
+        rechazos = {}
+
+        def respuesta(e, ok, deja):
+            rechazos[e] = rechazos.get(e, 0) + 1
+            return (False, None) if rechazos[e] <= 2 else (ok, deja)           # cada estación rechaza dos veces y luego acepta
+        m.estacion.respuesta = respuesta
+        m.correr()
+        self.assertEqual(m.fsm.estado, E.FIN)
+        self.assertEqual([p.rechazos for p in m.mision.pits[:4]], [2, 2, 2, 2])
+
+    def test_un_rechazo_vuelve_a_medir_y_a_acoplar_antes_de_solicitar(self):
+        m = Mundo(**CALIBRADO)
+        self.rechazar(m, 1, est=1)
+        hasta(m, E.ESPERANDO_RESULTADO)
+        hasta(m, E.MIDIENDO)                                                     # el rechazo lo devuelve a medir
+        self.assertFalse(m.fsm.entorno.intercambio)
+        self.assertTrue(solo_ceros(m, m.t - 0.5))
+        hasta(m, E.ESPERANDO_RESULTADO)
         self.assertEqual(len(m.estacion.solicitudes), 2)
-        self.assertFalse(m.mision.pits[-1].valido)
-        self.assertEqual(m.mision.pits[-1].motivo, 'RESULTADO_NO_OK')
-        self.assertTrue(solo_ceros(m, m.t - 1.0))
+
+    def test_solicita_solo_cuando_la_estacion_esta_esperando(self):
+        m = Mundo(**CALIBRADO)
+        m.fsm.recibir_estacion(1, 'LIBRE')
+        hasta(m, E.SOLICITANDO)
+        avanzar(m, 2.0)
+        self.assertEqual((m.fsm.estado, len(m.estacion.solicitudes)), (E.SOLICITANDO, 0))
+        m.fsm.recibir_estacion(1, 'ESPERANDO')
+        avanzar(m, 0.2)
+        self.assertEqual((m.fsm.estado, len(m.estacion.solicitudes)), (E.ESPERANDO_RESULTADO, 1))
+        self.assertEqual((m.mision.pits[0].rechazos, m.mision.pits[0].reintentos), (0, 0))
+
+    def test_si_la_estacion_no_pasa_a_esperando_falla_por_plazo_sin_solicitar(self):
+        m = Mundo(**CALIBRADO)
+        m.fsm.recibir_estacion(1, 'CAMBIANDO')
+        avanzar(m, 60.0)
+        self.assertEqual((m.fsm.estado, m.fsm.motivo, len(m.estacion.solicitudes)), (E.FALLA, 'TIMEOUT_SOLICITANDO', 0))
+
+    def test_sin_la_compuerta_de_esperando_solicita_de_inmediato(self):
+        cfg = dataclasses.replace(ConfigMision(), seguridad=dataclasses.replace(ConfigMision().seguridad, solicitar_solo_si_esperando=False))
+        m = Mundo(cfg_mision=cfg, **CALIBRADO)
+        m.fsm.recibir_estacion(1, 'LIBRE')
+        hasta(m, E.ESPERANDO_RESULTADO)
+        self.assertEqual(len(m.estacion.solicitudes), 1)
+
+    def test_el_acople_solo_dispone_de_los_reintentos_que_quedan_en_la_parada(self):
+        m = Mundo(**CALIBRADO)
+        vistos, real = [], mp.acoplar_pasos
+
+        def espia(medir, mover, cfg, *resto):
+            vistos.append(cfg.reintentos)
+            return real(medir, mover, cfg, *resto)
+        self.rechazar(m, 2, est=1)
+        with mock.patch.object(mp, 'acoplar_pasos', espia):
+            m.correr()
+        tope = m.fsm.cfg_acople.reintentos
+        self.assertEqual(vistos[:4], [min(tope, 2), min(tope, 1), 0, min(tope, 2)])        # 2 rechazos gastan 2 reintentos; la parada siguiente renueva
+
+    def test_el_rechazo_queda_registrado_con_su_motivo(self):
+        reg = RegistroEventos(lambda: 1.7e9)
+        m = Mundo(eventos=reg, **CALIBRADO)
+        self.rechazar(m, 1)
+        m.correr()
+        res = [e for e in reg.eventos if e.tipo == 'resultado' and e.datos.get('ok') is False]
+        self.assertEqual([(e.estacion, e.motivo) for e in res], [(2, 'RECHAZADA')])
+        (rech,) = [e for e in reg.eventos if e.tipo == 'rechazo']
+        self.assertEqual((rech.estacion, rech.datos['restantes']), (2, 1))
 
     def test_pieza_inesperada_no_detiene_la_mision_pero_la_marca(self):
         m = Mundo(**CALIBRADO)

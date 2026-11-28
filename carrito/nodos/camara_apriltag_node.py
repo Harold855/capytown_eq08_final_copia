@@ -9,7 +9,7 @@ from carrito.granprix_carrito.gestor_reset import cuaternion_de_dth  # noqa: E40
 
 CANALES = {'mono8': 1, 'rgb8': 3, 'bgr8': 3}
 PARAMETROS = {
-    'camara_yaml': '', 'tamano_mm': 0.0, 'tag_id': 0, 'image_topic': '/camera/image_raw', 'tag_topic': '/tag/pose',
+    'camara_yaml': '', 'tamano_mm': 0.0, 'tag_id': 0, 'image_topic': '/camera/image_raw', 'tag_topic': '/tag/pose', 'dock_topic': '/pit/dock',
     'frame_id': 'camera_optical_frame', 'margen_min': 30.0, 'hamming_max': 0, 'ventana': 5, 'estado_s': 2.0,
 }
 
@@ -34,7 +34,7 @@ def _clase_nodo():
     from rclpy.node import Node
     from rclpy.qos import qos_profile_sensor_data
     from sensor_msgs.msg import Image
-    from std_msgs.msg import String
+    from std_msgs.msg import Int32, String
 
     from vision.medicion import CamaraTag, Criterios, ErrorMedicion, FiltroMediana
 
@@ -50,19 +50,35 @@ def _clase_nodo():
             self.camara = CamaraTag.desde_yaml(p['camara_yaml'], p['tamano_mm'] or None)
             self.criterios = Criterios(p['margen_min'], int(p['hamming_max']))
             self.filtro = FiltroMediana(int(p['ventana']))
-            self.tag_id = int(p['tag_id']) or None
+            self.tag_id = int(p['tag_id']) or None      # fijo (pruebas con un solo dock); 0 = el de la estación actual (/pit/dock)
+            self.estacion = None
             self.conteo = {}
             self.pub = self.create_publisher(PoseStamped, p['tag_topic'], 10)
             self.estado_pub = self.create_publisher(String, '~/estado', 10)
             self.create_subscription(Image, p['image_topic'], self._imagen, qos_profile_sensor_data)
+            self.create_subscription(Int32, p['dock_topic'], self._dock, 10)
             self.create_timer(p['estado_s'], self._estado)
 
         def _contar(self, clave):
             self.conteo[clave] = self.conteo.get(clave, 0) + 1
-            if clave in ('imagen_invalida', 'resolucion') and self.conteo[clave] % 100 == 1:
+            if clave in ('imagen_invalida', 'resolucion', 'sin_dock') and self.conteo[clave] % 100 == 1:
                 self.get_logger().warning(f'imagen descartada por {clave} (ocurrencia {self.conteo[clave]})')
 
+        def _dock(self, msg):
+            n = int(msg.data)
+            if n not in (1, 2, 3, 4):
+                self._contar('dock_invalido')
+                return
+            if n != self.estacion:
+                self.estacion = n
+                self.filtro = FiltroMediana(int(self.p['ventana']))          # lo medido del tag anterior no vale para éste
+                self.get_logger().info(f'se busca el tag de la estación {n}')
+
         def _imagen(self, msg):
+            objetivo = self.tag_id or self.estacion                            # el ID del tag es el número de estación
+            if objetivo is None:
+                self._contar('sin_dock')                                       # sin saber qué dock toca, no se mide (falla cerrada)
+                return
             try:
                 gris = imagen_a_gris(msg.height, msg.width, msg.encoding, msg.step, msg.data)
             except ValueError:
@@ -70,13 +86,13 @@ def _clase_nodo():
                 return
             stamp = msg.header.stamp
             try:
-                med = self.camara.medir(gris, self.tag_id, self.criterios, ts=stamp.sec + stamp.nanosec * 1e-9)
+                med = self.camara.medir(gris, objetivo, self.criterios, ts=stamp.sec + stamp.nanosec * 1e-9)
             except ErrorMedicion:
                 self._contar('resolucion')
                 return
             self._contar('valido' if med.valido else med.motivo)
             pose = self.filtro.agregar(med)
-            if pose is None:
+            if pose is None or not med.valido:      # un cuadro sin tag no republica la pose anterior con la hora de ahora
                 return
             m = PoseStamped()
             m.header.stamp, m.header.frame_id = stamp, self.p['frame_id']

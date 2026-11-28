@@ -93,9 +93,13 @@ class TestNodo(unittest.TestCase):
     def tearDownClass(cls):
         cls.dir.cleanup()
 
-    def crear(self, **p):
+    def crear(self, dock=3, **p):
+        """`dock`: la estación que anuncia /pit/dock (None = nadie lo ha anunciado). Con `tag_id` fijo no hace falta."""
         Node.sobrescribe = {'camara_yaml': self.yaml_d, 'tamano_mm': 59.5, 'ventana': 1, **p}
-        return cam._clase_nodo()()
+        n = cam._clase_nodo()()
+        if dock is not None and not p.get('tag_id'):
+            n.callback('/pit/dock')(Ns(data=dock))
+        return n
 
     @staticmethod
     def foto(x_m=0.05, z_m=0.30, yaw=4.0, tag_id=3, semilla=1, dist=DIST):
@@ -112,7 +116,7 @@ class TestNodo(unittest.TestCase):
 
     def test_se_suscribe_y_publica_en_los_topicos_esperados(self):
         n = self.crear(image_topic='/usb_cam/image_raw')
-        self.assertEqual([t for _, t, _ in n.subs], ['/usb_cam/image_raw'])
+        self.assertEqual([t for _, t, _ in n.subs], ['/usb_cam/image_raw', '/pit/dock'])
         self.assertEqual({t for _, t, _ in n.pubs}, {'/tag/pose', '~/estado'})
 
     def test_una_imagen_con_tag_publica_la_pose_con_la_hora_de_captura(self):
@@ -161,6 +165,102 @@ class TestNodo(unittest.TestCase):
         self.assertEqual(n.conteo, {'sin_tag': 1, 'otro_id': 1, 'resolucion': 1, 'imagen_invalida': 1})
         n.timers[0][1]()
         self.assertEqual(json.loads(n.publicador('~/estado').enviados[-1].data)['sin_tag'], 1)
+
+    @staticmethod
+    def dos_tags(a=2, b=3, z_m=0.30):
+        """Dos tags a la vista (el del dock y otro, p. ej. de otra estación o de un cubo), uno a cada lado."""
+        return np.minimum(TestNodo.foto(x_m=-0.09, z_m=z_m, tag_id=a, semilla=1), TestNodo.foto(x_m=0.09, z_m=z_m, tag_id=b, semilla=2))
+
+    def publicadas(self, n):
+        return n.publicador('/tag/pose').enviados
+
+    def test_sin_saber_la_estacion_no_mide_aunque_vea_un_tag(self):
+        n = self.crear(dock=None)
+        n.callback('/camera/image_raw')(imagen_msg(self.foto(tag_id=2)))
+        self.assertEqual(self.publicadas(n), [])
+        self.assertEqual(n.conteo, {'sin_dock': 1})
+        n.callback('/pit/dock')(Ns(data=2))
+        n.callback('/camera/image_raw')(imagen_msg(self.foto(tag_id=2)))
+        self.assertEqual(len(self.publicadas(n)), 1)
+
+    def test_solo_mide_el_tag_de_la_estacion_actual(self):
+        n = self.crear(dock=2)
+        cb = n.callback('/camera/image_raw')
+        cb(imagen_msg(self.foto(tag_id=3)))                                     # el tag de OTRA estación, bien visible
+        self.assertEqual((self.publicadas(n), n.conteo), ([], {'otro_id': 1}))
+        cb(imagen_msg(self.foto(tag_id=2)))
+        self.assertEqual(len(self.publicadas(n)), 1)
+        n.callback('/pit/dock')(Ns(data=3))                                      # el carro sigue a la estación 3
+        cb(imagen_msg(self.foto(tag_id=2)))
+        self.assertEqual(len(self.publicadas(n)), 1)                             # ya no acepta el 2
+        cb(imagen_msg(self.foto(tag_id=3)))
+        self.assertEqual(len(self.publicadas(n)), 2)
+
+    def test_con_dos_tags_a_la_vista_mide_el_de_la_estacion(self):
+        for dock, x_esperado in ((2, -0.09), (3, 0.09)):
+            n = self.crear(dock=dock)
+            n.callback('/camera/image_raw')(imagen_msg(self.dos_tags()))
+            (m,) = self.publicadas(n)
+            self.assertAlmostEqual(m.pose.position.x, x_esperado, delta=0.008, msg=dock)
+
+    def test_con_dos_tags_y_sin_id_no_se_adivina(self):
+        n = self.crear(dock=None, tag_id=0)
+        n.callback('/camera/image_raw')(imagen_msg(self.dos_tags()))
+        self.assertEqual(self.publicadas(n), [])                                  # sin dock no mide: nada de elegir "el primero"
+
+    def test_dos_tags_con_el_mismo_id_se_rechazan(self):
+        n = self.crear(dock=2)
+        n.callback('/camera/image_raw')(imagen_msg(self.dos_tags(2, 2)))
+        self.assertEqual((self.publicadas(n), n.conteo), ([], {'varios_tags': 1}))
+
+    def test_al_cambiar_de_estacion_el_filtro_empieza_de_cero(self):
+        n = self.crear(dock=2, ventana=3)
+        cb = n.callback('/camera/image_raw')
+        for k in range(2):
+            cb(imagen_msg(self.foto(tag_id=2, z_m=0.26, semilla=k)))
+        n.callback('/pit/dock')(Ns(data=3))
+        cb(imagen_msg(self.foto(tag_id=3, z_m=0.34, semilla=5)))
+        self.assertEqual(self.publicadas(n), [])                                  # con el filtro viejo ya habría 3 cuadros y mezclaría
+        for k in range(2):
+            cb(imagen_msg(self.foto(tag_id=3, z_m=0.34, semilla=6 + k)))
+        (m,) = self.publicadas(n)
+        self.assertAlmostEqual(m.pose.position.z, 0.34, delta=0.006)
+
+    def test_repetir_la_misma_estacion_no_reinicia_el_filtro(self):
+        n = self.crear(dock=2, ventana=3)
+        cb = n.callback('/camera/image_raw')
+        for k in range(2):
+            cb(imagen_msg(self.foto(tag_id=2, semilla=k)))
+            n.callback('/pit/dock')(Ns(data=2))                                   # la máquina lo repite cada segundo
+        cb(imagen_msg(self.foto(tag_id=2, semilla=2)))
+        self.assertEqual(len(self.publicadas(n)), 1)
+
+    def test_un_tag_id_fijo_ignora_el_dock(self):
+        n = self.crear(dock=None, tag_id=3)
+        n.callback('/pit/dock')(Ns(data=2))
+        n.callback('/camera/image_raw')(imagen_msg(self.foto(tag_id=3)))
+        self.assertEqual(len(self.publicadas(n)), 1)
+        n.callback('/camera/image_raw')(imagen_msg(self.foto(tag_id=2)))
+        self.assertEqual((len(self.publicadas(n)), n.conteo['otro_id']), (1, 1))
+
+    def test_un_dock_invalido_se_descarta_y_se_conserva_el_anterior(self):
+        n = self.crear(dock=2)
+        for malo in (0, 5, -1, 99):
+            n.callback('/pit/dock')(Ns(data=malo))
+        self.assertEqual((n.estacion, n.conteo['dock_invalido']), (2, 4))
+        n.callback('/camera/image_raw')(imagen_msg(self.foto(tag_id=2)))
+        self.assertEqual(len(self.publicadas(n)), 1)
+
+    def test_un_cuadro_sin_tag_no_republica_la_pose_anterior_con_hora_nueva(self):
+        n = self.crear(dock=2, ventana=1)
+        cb = n.callback('/camera/image_raw')
+        cb(imagen_msg(self.foto(tag_id=2), sec=20))
+        self.assertEqual(len(self.publicadas(n)), 1)
+        cb(imagen_msg(np.full((ALTO, ANCHO), 200, np.uint8), sec=21))             # el tag desapareció
+        cb(imagen_msg(self.foto(tag_id=3), sec=22))                                 # y se ve otro
+        self.assertEqual([m.header.stamp.sec for m in self.publicadas(n)], [20])
+        cb(imagen_msg(self.foto(tag_id=2), sec=23))
+        self.assertEqual([m.header.stamp.sec for m in self.publicadas(n)], [20, 23])
 
     def test_el_filtro_espera_cuadros_y_da_la_mediana(self):
         n = self.crear(ventana=3)

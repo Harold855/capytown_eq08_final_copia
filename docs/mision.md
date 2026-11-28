@@ -92,7 +92,7 @@ El curso no ha publicado las interfaces del `puente_mqtt`; los nombres son pará
 | entra | `/granprix/resultado` | `ResultadoMsg` más `"estacion": n`; solo el de nuestro equipo |
 | sale | `/cmd_vel` | `Twist`; apuntar a la entrada autorizada de `twist_mux` |
 | sale | `/granprix/solicitud`, `evento`, `vuelta`, `telemetria` | JSON del contrato (constructores de `mensajes_contrato.py`) |
-| sale | `/pit/estado`, `/pit/dock` | estado (JSON) y estación actual (`Int32`; lo usa `nodo_reset_pose`) |
+| sale | `/pit/estado`, `/pit/dock` | estado (JSON) y estación actual (`Int32`; la usan `nodo_reset_pose` y el nodo de cámara; **se repite cada segundo** para quien arranque tarde) |
 | cliente | `/reset_pose/aplicar` | `Trigger` de `nodo_reset_pose`; si no está disponible se sigue sin reset |
 | servicios | `~/reiniciar`, `~/parar` | `Trigger` |
 

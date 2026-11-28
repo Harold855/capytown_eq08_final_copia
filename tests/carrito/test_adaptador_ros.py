@@ -266,10 +266,25 @@ class TestCiclo(Base):
         self.assertEqual(n.fsm.estado, E.NAVEGANDO)
         self.assertEqual([json.loads(m.data)['tipo'] for m in self.pub('/granprix/evento')], ['pit_ok'])
         self.assertTrue(any(m.angular.z != 0.0 for m in self.pub('/cmd_vel')))
-        self.assertEqual([m.data for m in self.nodo.publicador('/pit/dock').enviados][:2], [1, 2])
+        docks = [m.data for m in self.nodo.publicador('/pit/dock').enviados]
+        self.assertEqual([d for i, d in enumerate(docks) if i == 0 or d != docks[i - 1]], [1, 2])      # E1 y luego E2 (con repeticiones)
         estados = [json.loads(m.data)['estado'] for m in self.pub('/pit/estado')]
         self.assertEqual(estados[:2], ['ESPERA', 'MIDIENDO'])
         self.assertEqual(estados[-1], 'NAVEGANDO')
+
+    def test_el_dock_se_repite_cada_segundo_para_quien_arranque_tarde(self):
+        n = self.crear()
+        n._tick()
+        self.assertEqual(len(self.pub('/pit/dock')), 1)
+        self.t[0] += 0.9
+        n._tick()
+        self.assertEqual(len(self.pub('/pit/dock')), 1)                           # aún no
+        self.t[0] += 0.2
+        n._tick()
+        self.assertEqual([m.data for m in self.pub('/pit/dock')], [1, 1])
+        self.t[0] += 1.1
+        n._tick()
+        self.assertEqual(len(self.pub('/pit/dock')), 3)
 
     def test_dock_y_estado_solo_se_publican_al_cambiar(self):
         n = self.crear()
